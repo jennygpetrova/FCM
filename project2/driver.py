@@ -1,5 +1,5 @@
 import numpy as np
-from project2 import LU_Factorization as lu
+from project2 import LU_factorization as lu
 import matplotlib.pyplot as plt
 import random
 np.random.seed(42)
