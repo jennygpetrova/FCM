@@ -70,13 +70,16 @@ def compute_PrAPc(A_copy, Pr, Pc):
     return A_perm
 
 # Solve Ax=b for x using forward and backward substitution
-def x_solve(A, b, n):
+def lower_solve(A, b, n):
     # Forward substitution to solve Ly = b for y (where L is stored in A)
     y = np.zeros(n)
     y[0] = b[0]
     for i in range(1, n):
         y[i] = b[i] - np.dot(A[i, :i], y[:i])
 
+    return y
+
+def upper_solve(A, y, n):
     # Backward substitution to solve Ux = y for x (where U is stored in A)
     x = np.zeros(n)
     x[n - 1] = y[n - 1] / A[n - 1, n - 1]

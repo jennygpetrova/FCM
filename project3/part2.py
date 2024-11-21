@@ -8,15 +8,18 @@ np.random.seed(1234)
 """
 # Jacobi Iteration Method
 def jacobi_iteration(A, x_tilde, x0):
+    b = np.dot(A, x_tilde)
     # Diagonal elements of A
     D = np.diag(A)
     if np.any(D == 0):
         raise ValueError("Matrix A contains zero diagonal elements, Jacobi iteration cannot proceed.")
 
     # Initial values
+    P = D # preconditioner
     x = x0
     resid_arr = []
     err_arr = []
+    n = x.size
 
     # Termination criterion
     max_iter = 1000
@@ -24,7 +27,6 @@ def jacobi_iteration(A, x_tilde, x0):
     iter = 0
 
     for _ in range(max_iter):
-        b = A * x
         # Compute residual
         r = b - np.dot(A, x)
         resid_arr.append(np.linalg.norm(r))
@@ -37,16 +39,51 @@ def jacobi_iteration(A, x_tilde, x0):
             break
 
         # Jacobi iteration update
-        x += (r / D)
+            x += (r / P)
 
         iter += 1
 
-    return (x, iter, resid_arr)
+    return x, iter, resid_arr, err_arr
 
 # Gauss-Seidel (Forward) Iteration Method
 def gauss_seidel(A, x_tilde, x0):
+    b = A * x_tilde
+    # Diagonal elements of A
+    D = np.diag(A)
+    # Lower triangular elements of A
+    L = np.tril(A)
 
+    # Initial values
+    P = D - L  # preconditioner
+    x = x0
+    resid_arr = []
+    err_arr = []
+    n = x.size
 
+    # Termination criterion
+    max_iter = 1000
+    tol = 1e-6
+    iter = 0
+
+    for _ in range(max_iter):
+        # Compute residual
+        r = b - np.dot(A, x)
+        resid_arr.append(np.linalg.norm(r))
+
+        err = np.subtract(x_tilde, x)
+        err_norm = np.linalg.norm(err)
+        err_arr.append(err_norm)
+
+        if err_norm / np.linalg.norm(err) < tol:  # Convergence check
+            break
+
+        # Jacobi iteration update
+        delta_x = myfunctions.lower_solve(P, r, n)
+        x += delta_x
+
+        iter += 1
+
+    return x, iter, resid_arr, err_arr
 
 
 def part_2_driver(choice):
@@ -70,4 +107,10 @@ def part_2_driver(choice):
 
     return A
 
-print(part_2_driver(0))
+A= part_2_driver(0)
+print(A)
+x_tilde = np.random.uniform(-10, 10, 3)
+x0 = np.ones(3)
+x, iter, resid_arr, err_arr = jacobi_iteration(A, x_tilde, x0)
+print(x)
+print(iter)

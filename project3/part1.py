@@ -1,134 +1,167 @@
-from mypackage import myfunctions
 import numpy as np
-import matplotlib.pyplot as plt
-np.random.seed(1234)
 
 """
 -------------------- Functions for Iterative Methods --------------------
 """
 
 # Richardson's First Order Stationary Method
-def richardsons_stationary(A, x_tilde, x0):
-    alpha = 2 / (np.max(A) + np.min(A))  # Optimal alpha for diagonal matrix
-    b_tilde = A * x_tilde  # A is a vector, so use element-wise multiplication
+def richardsons_stationary(A, x_tilde, x0, b_tilde):
+    # Optimal alpha for diagonal matrix
+    alpha = 2 / (np.max(A) + np.min(A))
 
-    r = b_tilde - A * x0  # Initial residual
+    # Initial residual
+    r = b_tilde - A * x0
     r0_norm = np.linalg.norm(r)
     resid_arr = [r0_norm]
+    r_norm = r0_norm
 
-    err = np.subtract(x_tilde, x0)  # Initial error
+    # Initial error
+    err = x0 - x_tilde
     err_arr = [np.linalg.norm(err)]
+    err_ratio = [1.0]
 
-    x = x0
+    # Initial guess
+    x = x0.copy()
 
     # Termination criterion
     max_iter = 1000
     tol = 1e-6
     iter = 0
 
-    for _ in range(max_iter):
-        x += alpha * r  # Update x
-        r = b_tilde - A * x  # Update residual
+    while iter < max_iter and r_norm / r0_norm > tol:
+        # Update x
+        x += alpha * r
 
+        # Update residual
+        r -= alpha * (A * r)
+
+        # Store residual norms
         r_norm = np.linalg.norm(r)
         resid_arr.append(r_norm)
 
-        err = np.subtract(x_tilde, x)
-        err_arr.append(np.linalg.norm(err))
+        # Store error
+        err_next = x - x_tilde
+        err_arr.append(np.linalg.norm(err_next))
+        err_ratio.append(np.linalg.norm(err_next) / np.linalg.norm(err))
 
-        if r_norm / r0_norm < tol:
-            break
+        # Keep error term at current step after calculating error ratio
+        err = err_next
 
+        # Increment iteration counter
         iter += 1
 
-    return x, iter, resid_arr, err_arr
+    return x, iter, resid_arr, err_arr, err_ratio
 
 
 # Steepest Descent Method (SD)
-def steepest_descent(A, x_tilde, x0):
-    b_tilde = A * x_tilde  # A is a vector, so use element-wise multiplication
-
-    r = b_tilde - A * x0  # Initial residual
-    r0_norm = np.linalg.norm(r)
-    resid_arr = [r0_norm]
-
-    err = np.subtract(x_tilde, x0)  # Initial error
-    err_arr = [np.linalg.norm(err)]
-
-    x = x0
-
-    max_iter = 1000
-    tol = 1e-6
-    iter = 0
-
-    for _ in range(max_iter):
-        v = A * r  # Element-wise multiplication
-        alpha = np.dot(r, r) / np.dot(r, v)  # Calculate step size alpha
-
-        x += alpha * r  # Update x
-        r -= alpha * v  # Update residual
-
-        r_norm = np.linalg.norm(r)
-        resid_arr.append(r_norm)
-
-        err = np.subtract(x_tilde, x)  # Update error
-        err_arr.append(np.linalg.norm(err))
-
-        if r_norm / r0_norm < tol:  # Check termination criterion
-            break
-
-        iter += 1
-
-    return x, iter, resid_arr, err_arr
-
-
-# Conjugate Gradient Method (CG)
-def conjugate_gradient(A, x_tilde, x0):
-    b_tilde = A * x_tilde  # A is a vector, so use element-wise multiplication
-
+def steepest_descent(A, x_tilde, x0, b_tilde):
+    # Initial residual
     r = b_tilde - A * x0
     r0_norm = np.linalg.norm(r)
     resid_arr = [r0_norm]
+    r_norm = r0_norm
 
-    err = np.subtract(x_tilde, x0)
-    err_arr = [np.linalg.norm(err)]
+    # Initial error
+    err = x0 - x_tilde
+    err_A_norm = np.sqrt(np.sum(A * (err ** 2)))
+    err_arr = [err_A_norm]
+    err_ratio = [1.0]
 
-    x = x0
-    d = r
-    sigma = np.dot(r, r)
+    # Initial guess
+    x = x0.copy()
 
+    # Termination criterion
     max_iter = 1000
     tol = 1e-6
     iter = 0
-    for _ in range(max_iter):
-        v = A * d  # Element-wise multiplication
-        mu = np.dot(d, v)
-        alpha = sigma / mu
 
-        x += alpha * d
+    while iter < max_iter and r_norm / r0_norm > tol:
+        # Update v
+        v = A * r
+
+        # Optimal alpha calculated at each iteration
+        alpha = np.dot(r, r) / np.dot(r, v)
+
+        # Update x
+        x += alpha * r
+
+        # Update residual
         r -= alpha * v
-        sigma_next = np.dot(r, r)
 
-        beta = sigma_next / sigma
-        d = r + beta * d
-
+        # Store residual norms
         r_norm = np.linalg.norm(r)
         resid_arr.append(r_norm)
 
-        err = np.subtract(x_tilde, x)
-        err_arr.append(np.linalg.norm(err))
+        # Store error at current step
+        err = x - x_tilde
+        err_A_norm_next = np.sqrt(np.sum(A * (err ** 2)))
+        err_arr.append(err_A_norm_next)
+        err_ratio.append(err_A_norm_next / err_A_norm)
 
-        if r_norm / r0_norm < tol:
-            break
+        # Keep error term at current step after calculating error ratio
+        err_A_norm = err_A_norm_next
 
+        # Increment iteration counter
         iter += 1
+
+    return x, iter, resid_arr, err_arr, err_ratio
+
+
+# Conjugate Gradient Method (CG)
+def conjugate_gradient(A, x_tilde, x0, b_tilde):
+    # Initial residual
+    r = b_tilde - A * x0
+    r0_norm = np.linalg.norm(r)
+    resid_arr = [r0_norm]
+    r_norm = r0_norm
+
+    # Initial error
+    err = x0 - x_tilde
+    err_A_norm = np.sqrt(np.sum(A * (err ** 2)))
+    err_arr = [err_A_norm]
+    err_ratio = [1.0]
+
+    # Initial variables
+    x = x0.copy()
+    d = r.copy()
+    sigma = np.dot(r, r)
+
+    # Termination criterion
+    max_iter = 1000
+    tol = 1e-6
+    iter = 0
+
+    while iter < max_iter and r_norm / r0_norm > tol:
+        # Update variables
+        v = A * d
+        mu = np.dot(d, v)
+        alpha = sigma / mu
+        x += alpha * d
+        r -= alpha * v
+        sigma_next = np.dot(r, r)
+        beta = sigma_next / sigma
+        d = r + beta * d
+
+        # Store residual norms
+        r_norm = np.linalg.norm(r)
+        resid_arr.append(r_norm)
+
+        # Store error at current step
+        err = x - x_tilde
+        err_A_norm_next = np.sqrt(np.sum(A * (err ** 2)))
+        err_arr.append(err_A_norm_next)
+        err_ratio.append(err_A_norm_next / err_A_norm)
+
+        # Keep error term and sigma term at current step
+        err_A_norm = err_A_norm_next
         sigma = sigma_next
 
-    return x, iter, resid_arr, err_arr
+        iter += 1
 
+    return x, iter, resid_arr, err_arr, err_ratio
 
 """
--------------------- Driver to Test Matrices --------------------
+-------------------- Routine to Generate Test Matrices --------------------
 """
 def part_1_driver(choice, n, lmin, lmax):
     # All eigenvalues the same
@@ -138,21 +171,20 @@ def part_1_driver(choice, n, lmin, lmax):
     # k distinct eigenvalues with randomly chosen multiplicities
     elif choice == 2:
         k = np.random.randint(1, n + 1)
-        lambdas = np.random.choice(np.arange(1, n + 1), size=k, replace=False)
+        lambdas = np.random.uniform(lmin, lmax, k)
         multiplicities = np.random.multinomial(n, [1 / k] * k)
-        eigenvalues = []
-        for l, m in zip(lambdas, multiplicities):
-            eigenvalues.extend([l] * m)
+        eigenvalues = np.repeat(lambdas, multiplicities)
 
-    # k random eigenvalues
+    # k random eigenvalues from a cloud of normally distributed eigenvalues
     elif choice == 3:
         k = np.random.randint(1, n + 1)
-        lambdas = np.random.choice(np.arange(1, n + 1), size=k, replace=False)
+        lambdas = np.random.uniform(lmin, lmax, k)
         multiplicities = np.random.multinomial(n, [1 / k] * k)
         eigenvalues = []
         for l, m in zip(lambdas, multiplicities):
             cloud = np.random.normal(l, 1, m)
             eigenvalues.extend(cloud)
+        eigenvalues = np.array(eigenvalues)
 
     # n uniformly distributed eigenvalues
     elif choice == 4:
@@ -160,29 +192,24 @@ def part_1_driver(choice, n, lmin, lmax):
 
     # n normally distributed eigenvalues
     else:
-        mean = (lmin - lmax) / 2
-        eigenvalues = np.random.normal(mean, 1, n)
+        mean = (lmin + lmax) / 2
+        std_dev = (lmax - lmin) / 6
+        eigenvalues = np.random.normal(mean, std_dev, n)
 
-    return eigenvalues
-
+    return np.array(eigenvalues)
 
 """
-Run the 3 methods for each choice of A, for several values of A for several sizes n.
+-------------------- Driver --------------------
 """
 def get_user_inputs():
-    """
-    Prompts user for:
-        - Size of the (nxn) matrix A
-        - Range of random values (xmin, xmax) to generate solution vector x_tilde
-        - Minimum and maximum eigenvalues (lmin, lmax)
-    """
-
     print("\nEnter range of dimensions to generate (nxn) matrix A: ")
     nmin = int(input("Minimum value: "))
     nmax = int(input("Maximum value: "))
+
     print("\nEnter range to generate random values for solution vector and initial guess vector:")
     dmin = float(input("Minimum value: "))
     dmax = float(input("Maximum value: "))
+
     print("\nChoose Minimum and Maximum for Eigenvalues (Must be positive): ")
     lmin = float(input("Enter lambda min: "))
     lmax = float(input("Enter lambda max: "))
@@ -205,51 +232,64 @@ RF_x = []
 RF_iter = []
 RF_res = []
 RF_err = []
+RF_ratio = []
 
 SD_x = []
 SD_iter = []
 SD_res = []
 SD_err = []
+SD_ratio = []
 
 CG_x = []
 CG_iter = []
 CG_res = []
 CG_err = []
+CG_ratio = []
 
-for n in range(nmin, nmax+1, 2):
+for n in range(nmin, nmax + 1):
     ndim.append(n)
     x_tilde = np.random.uniform(dmin, dmax, n)
     x0 = np.random.uniform(dmin, dmax, n)
 
     print("\nSolution Vector x_tilde = ", x_tilde)
-    print("\nInitial Guess Vector x_0 = ", x0)
-    A = part_1_driver(choice, n, lmin, lmax)
-    print("\nDiagonal Matrix A: ", A)
-    b_tilde = np.dot(A, x_tilde)
+    print("\nInitial Guess Vector x0 = ", x0)
 
-    x_RF, iter_RF, resid_arr_RF, err_arr_RF = richardsons_stationary(A, x_tilde, x0)
-    print("\nRF solution vector: ", x_RF)
-    print("\nNumber of iterations: ", iter_RF)
-    RF_err.append(err_arr_RF[-1])
+    # Generate diagonal matrix stored as a vector of eigenvalues
+    A = part_1_driver(choice, n, lmin, lmax)
+    print("\nDiagonal Matrix A (as vector): ", A)
+
+    # Compute b_tilde
+    b_tilde = A * x_tilde
+    print("\nb_tilde = A * x_tilde: ", b_tilde)
+
+    # Richardson's Stationary Method
+    x_RF, iter_RF, resid_arr_RF, err_arr_RF, err_ratio_RF = richardsons_stationary(A, x_tilde, x0, b_tilde)
+    print("\nRF Solution Vector: ", x_RF)
+    print("Number of Iterations (RF): ", iter_RF)
     RF_iter.append(iter_RF)
 
-    x_SD, iter_SD, resid_arr_SD, err_arr_SD = steepest_descent(A, x_tilde, x0)
-    print("\nSD stationary solution vector: ", x_SD)
-    print("\nNumber of iterations: ", iter_SD)
-    SD_err.append(err_arr_SD[-1])
-    SD_iter.append(iter_RF)
+    # Steepest Descent Method
+    x_SD, iter_SD, resid_arr_SD, err_arr_SD, err_ratio_SD = steepest_descent(A, x_tilde, x0, b_tilde)
+    print("\nSD Solution Vector: ", x_SD)
+    print("Number of Iterations (SD): ", iter_SD)
+    SD_iter.append(iter_SD)
 
-    x_CG, iter_CG, resid_arr_CG, err_arr_CG = conjugate_gradient(A, x_tilde, x0)
-    print("\nCG solution vector: ", x_CG)
-    print("\nNumber of iterations: ", iter_CG)
-    CG_err.append(err_arr_CG[-1])
-    CG_iter.append(iter_RF)
+    # Conjugate Gradient Method
+    x_CG, iter_CG, resid_arr_CG, err_arr_CG, err_ratio_CG = conjugate_gradient(A, x_tilde, x0, b_tilde)
+    print("\nCG Solution Vector: ", x_CG)
+    print("Number of Iterations (CG): ", iter_CG)
+    CG_iter.append(iter_CG)
 
-    kappa = np.max(A)/np.min(A)
-    bound_RF_SD = (kappa - 1)/(kappa + 1)
-    bound_CG = (np.sqrt(kappa) - 1)/(np.sqrt(kappa) + 1)
+# Compute condition number and convergence bounds
+kappa = np.max(A) / np.min(A)
+bound_RF_SD = (kappa - 1) / (kappa + 1)
+bound_CG = (np.sqrt(kappa) - 1) / (np.sqrt(kappa) + 1)
+print(f"\nCondition Number (kappa): {kappa:.2f}")
+print(f"Bound for RF/SD Convergence Rate: {bound_RF_SD:.4f}")
+print(f"Bound for CG Convergence Rate: {bound_CG:.4f}")
 
 
-""" 
--------------------- Plot Results for Each Method --------------------
+
+"""
+-------------------- Plots and Graphs --------------------
 """
