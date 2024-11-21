@@ -4,57 +4,76 @@ import matplotlib.pyplot as plt
 np.random.seed(1234)
 
 """
--------------------- Functions for Stationary Methods --------------------
+-------------------- Functions for Stationary Iterative Methods --------------------
 """
+
 # Jacobi Iteration Method
-def jacobi_iteration(A, x_tilde, x0):
-    b = np.dot(A, x_tilde)
+def jacobi_iteration(A, x_tilde, x0, b):
     # Diagonal elements of A
-    D = np.diag(A)
+    D = np.diagonal(A)
     if np.any(D == 0):
         raise ValueError("Matrix A contains zero diagonal elements, Jacobi iteration cannot proceed.")
 
+    # Preconditioner
+    P = D
+
+    # Initial residual
+    r = b - np.dot(A, x0)
+    r0_norm = np.linalg.norm(r)
+    resid_arr = [r0_norm]
+    r_norm = r0_norm
+
+    # Initial error
+    err = x0 - x_tilde
+    err_A_norm =  np.sqrt(np.sum(A * (err ** 2)))
+    err_arr = [err_A_norm]
+    err_ratio = [1.0]
+
     # Initial values
-    P = D # preconditioner
-    x = x0
-    resid_arr = []
-    err_arr = []
-    n = x.size
+    x = x0.copy()
 
     # Termination criterion
     max_iter = 1000
     tol = 1e-6
     iter = 0
 
-    for _ in range(max_iter):
+    while iter < max_iter and r_norm / r0_norm > tol:
+        # Iteration update
+        x += r / D
+
         # Compute residual
         r = b - np.dot(A, x)
-        resid_arr.append(np.linalg.norm(r))
 
-        err = np.subtract(x_tilde, x)
-        err_norm = np.linalg.norm(err)
-        err_arr.append(err_norm)
+        # Store residual norms
+        r_norm = np.linalg.norm(r)
+        resid_arr.append(r_norm)
 
-        if err_norm / np.linalg.norm(err) < tol:  # Convergence check
-            break
+        # Store error
+        err = x - x_tilde
+        err_A_norm_next = np.sqrt(np.sum(A * (err ** 2)))
+        err_arr.append(err_A_norm_next)
+        err_ratio.append(err_A_norm_next / err_A_norm)
 
-        # Jacobi iteration update
-            x += (r / P)
+        # Keep error term at current step after calculating error ratio
+        err_A_norm = err_A_norm_next
 
+        # Increment iteration counter
         iter += 1
 
-    return x, iter, resid_arr, err_arr
+    return x, iter, resid_arr, err_arr, err_ratio
 
 # Gauss-Seidel (Forward) Iteration Method
-def gauss_seidel(A, x_tilde, x0):
-    b = A * x_tilde
+def gauss_seidel(A, x_tilde, x0, b):
     # Diagonal elements of A
     D = np.diag(A)
     # Lower triangular elements of A
     L = np.tril(A)
 
-    # Initial values
-    P = D - L  # preconditioner
+
+    # Preconditioner
+    P = D - L
+
+    # Initial Values
     x = x0
     resid_arr = []
     err_arr = []
@@ -86,31 +105,81 @@ def gauss_seidel(A, x_tilde, x0):
     return x, iter, resid_arr, err_arr
 
 
+"""
+-------------------- Routine to Generate Test Matrices --------------------
+"""
 def part_2_driver(choice):
     if choice == 0:
-        A = np.matrix([[3, 7, -1], [7, 4, 1], [-1, 1, 2]])
-    elif choice == 1:
-        A = np.matrix([[3, 0, 4], [7, 4, 2], [-1, 1, 2]])
-    elif choice == 2:
-        A = np.matrix([[-3, 3, -6], [-4, 4, -8], [5, 7, -9]])
-    elif choice == 3:
-        A = np.matrix([[4, 1, 1], [2, -9, 0], [0, -8, -6]])
-    elif choice == 4:
-        A = np.matrix([[7,6,9], [4,5,-4], [-7,-3,8]])
-    elif choice == 5:
-        A = np.matrix([[6,-2,0], [-1,2,-1], [0,-1.2,1]])
-    elif choice == 6:
-        A = np.matrix([[5,-1,0], [-1,2,-1], [0,-1.5,1]])
-    elif choice == 7:
-        D = np.array(1,7)
-
+        A = np.array([
+            [3, 7, -1],
+            [7, 4, 1],
+            [-1, 1, 2]
+        ])
+    if choice == 1:
+        A = np.array([
+            [3, 0, 4],
+            [7, 4, 2],
+            [-1, -1, 2]
+        ])
+    if choice == 2:
+        A = np.array([
+            [-3, 3, -6],
+            [-4, 7, -8],
+            [5, 7, -9]
+        ])
+    if choice == 3:
+        A = np.array([
+            [4, 1, 1],
+            [2, -9, 0],
+            [0, -8, -6]
+        ])
+    if choice == 4:
+        A = np.array([
+            [7, 6, 9],
+            [4, 5, -4],
+            [-7, -3, 8]
+        ])
+    if choice == 5:
+        A = np.array([
+            [6, -2, 0],
+            [-1, 2, -1],
+            [0, -6/5, 1]
+        ])
+    if choice == 6:
+        A = np.array([
+            [5, -1, 0],
+            [-1, 2, -1],
+            [0, -3/2, 1]
+        ])
+    if choice == 7:
+        A = np.array([
+            [4, -1, 0, 0, 0, 0, 0],
+            [-1, 4, -1, 0, 0, 0, 0],
+            [0, -1, 4, -1, 0, 0, 0],
+            [0, 0, -1, 4, -1, 0, 0],
+            [0, 0, 0, -1, 4, -1, 0],
+            [0, 0, 0, 0, -1, 4, -1],
+            [0, 0, 0, 0, 0, -1, 4]
+        ])
+    if choice == 8:
+        A = np.array([
+            [2, -1, 0, 0, 0, 0, 0],
+            [-1, 2, -1, 0, 0, 0, 0],
+            [0, -1, 2, -1, 0, 0, 0],
+            [0, 0, -1, 2, -1, 0, 0],
+            [0, 0, 0, -1, 2, -1, 0],
+            [0, 0, 0, 0, -1, 2, -1],
+            [0, 0, 0, 0, 0, -1, 2]
+        ])
 
     return A
+
 
 A= part_2_driver(0)
 print(A)
 x_tilde = np.random.uniform(-10, 10, 3)
 x0 = np.ones(3)
-x, iter, resid_arr, err_arr = jacobi_iteration(A, x_tilde, x0)
+b = np.dot(A, x_tilde)
+x, iter, resid_arr, err_arr, err_ratio = jacobi_iteration(A, x_tilde, x0, b)
 print(x)
 print(iter)

@@ -5,12 +5,12 @@ import numpy as np
 """
 
 # Richardson's First Order Stationary Method
-def richardsons_stationary(A, x_tilde, x0, b_tilde):
+def richardsons_stationary(A, x_tilde, x0, b):
     # Optimal alpha for diagonal matrix
     alpha = 2 / (np.max(A) + np.min(A))
 
     # Initial residual
-    r = b_tilde - A * x0
+    r = b - A * x0
     r0_norm = np.linalg.norm(r)
     resid_arr = [r0_norm]
     r_norm = r0_norm
@@ -29,10 +29,8 @@ def richardsons_stationary(A, x_tilde, x0, b_tilde):
     iter = 0
 
     while iter < max_iter and r_norm / r0_norm > tol:
-        # Update x
+        # Iteration updates
         x += alpha * r
-
-        # Update residual
         r -= alpha * (A * r)
 
         # Store residual norms
@@ -54,9 +52,9 @@ def richardsons_stationary(A, x_tilde, x0, b_tilde):
 
 
 # Steepest Descent Method (SD)
-def steepest_descent(A, x_tilde, x0, b_tilde):
+def steepest_descent(A, x_tilde, x0, b):
     # Initial residual
-    r = b_tilde - A * x0
+    r = b - A * x0
     r0_norm = np.linalg.norm(r)
     resid_arr = [r0_norm]
     r_norm = r0_norm
@@ -76,23 +74,17 @@ def steepest_descent(A, x_tilde, x0, b_tilde):
     iter = 0
 
     while iter < max_iter and r_norm / r0_norm > tol:
-        # Update v
+        # Iteration updates
         v = A * r
-
-        # Optimal alpha calculated at each iteration
         alpha = np.dot(r, r) / np.dot(r, v)
-
-        # Update x
         x += alpha * r
-
-        # Update residual
         r -= alpha * v
 
         # Store residual norms
         r_norm = np.linalg.norm(r)
         resid_arr.append(r_norm)
 
-        # Store error at current step
+        # Store error
         err = x - x_tilde
         err_A_norm_next = np.sqrt(np.sum(A * (err ** 2)))
         err_arr.append(err_A_norm_next)
@@ -108,9 +100,9 @@ def steepest_descent(A, x_tilde, x0, b_tilde):
 
 
 # Conjugate Gradient Method (CG)
-def conjugate_gradient(A, x_tilde, x0, b_tilde):
+def conjugate_gradient(A, x_tilde, x0, b):
     # Initial residual
-    r = b_tilde - A * x0
+    r = b - A * x0
     r0_norm = np.linalg.norm(r)
     resid_arr = [r0_norm]
     r_norm = r0_norm
@@ -132,7 +124,7 @@ def conjugate_gradient(A, x_tilde, x0, b_tilde):
     iter = 0
 
     while iter < max_iter and r_norm / r0_norm > tol:
-        # Update variables
+        # Iteration updates
         v = A * d
         mu = np.dot(d, v)
         alpha = sigma / mu
@@ -146,7 +138,7 @@ def conjugate_gradient(A, x_tilde, x0, b_tilde):
         r_norm = np.linalg.norm(r)
         resid_arr.append(r_norm)
 
-        # Store error at current step
+        # Store error
         err = x - x_tilde
         err_A_norm_next = np.sqrt(np.sum(A * (err ** 2)))
         err_arr.append(err_A_norm_next)
