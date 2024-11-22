@@ -4,105 +4,78 @@ import matplotlib.pyplot as plt
 np.random.seed(1234)
 
 """
--------------------- Functions for Stationary Iterative Methods --------------------
+-------------------- Routine for Stationary Iterative Methods --------------------
 """
 
-# Jacobi Iteration Method
-def jacobi_iteration(A, x_tilde, x0, b):
-    # Diagonal elements of A
-    D = np.diagonal(A)
+def stationary_method(A, x_tilde, x0, b, flag):
+    # Initialize variables
+    x = x0
+    r = b - np.dot(A, x)
+    D = np.diag(A)
     if np.any(D == 0):
         raise ValueError("Matrix A contains zero diagonal elements, Jacobi iteration cannot proceed.")
-
-    # Preconditioner
-    P = D
-
-    # Initial residual
-    r = b - np.dot(A, x0)
-    r0_norm = np.linalg.norm(r)
-    resid_arr = [r0_norm]
-    r_norm = r0_norm
-
-    # Initial error
-    err = x0 - x_tilde
-    err_A_norm =  np.sqrt(np.sum(A * (err ** 2)))
-    err_arr = [err_A_norm]
-    err_ratio = [1.0]
-
-    # Initial values
-    x = x0.copy()
+    L = np.tril(A, k=-1)
+    U = np.triu(A, k=1)
+    rel_err_arr = []
+    rel_err = 1
+    n = len(x)
+    I = np.eye(n)
 
     # Termination criterion
     max_iter = 1000
     tol = 1e-6
     iter = 0
 
-    while iter < max_iter and r_norm / r0_norm > tol:
-        # Iteration update
-        x += r / D
+    # Jacobi Method
+    if flag == 1:
+        # Preconditioner
+        P = D
+        # Contraction form
+        G = I - (A/D)
+        while iter < max_iter and rel_err > tol:
+            rel_err = np.linalg.norm(x - x_tilde) / np.linalg.norm(x_tilde)
+            rel_err_arr.append(rel_err)
 
-        # Compute residual
-        r = b - np.dot(A, x)
+            # Iteration update
+            x += r / P
 
-        # Store residual norms
-        r_norm = np.linalg.norm(r)
-        resid_arr.append(r_norm)
+            # Compute residual
+            r = b - np.dot(A, x)
 
-        # Store error
-        err = x - x_tilde
-        err_A_norm_next = np.sqrt(np.sum(A * (err ** 2)))
-        err_arr.append(err_A_norm_next)
-        err_ratio.append(err_A_norm_next / err_A_norm)
+            # Increment iteration counter
+            iter += 1
 
-        # Keep error term at current step after calculating error ratio
-        err_A_norm = err_A_norm_next
+    # Gauss-Seidel (Forward) Method
+    if flag == 2:
+        # Contraction form
+        G = myfunctions.forward_sweep_GS(A, I, A, n)
+        while iter < 1000 and rel_err > tol:
+            rel_err = np.linalg.norm(x - x_tilde) / np.linalg.norm(x_tilde)
+            rel_err_arr.append(rel_err)
 
-        # Increment iteration counter
-        iter += 1
+            # Iteration update
+            x = myfunctions.forward_sweep_GS(A, x, b, n)
 
-    return x, iter, resid_arr, err_arr, err_ratio
+            # Increment iteration counter
+            iter += 1
 
-# Gauss-Seidel (Forward) Iteration Method
-def gauss_seidel(A, x_tilde, x0, b):
-    # Diagonal elements of A
-    D = np.diag(A)
-    # Lower triangular elements of A
-    L = np.tril(A)
+    # Gauss-Seidel (Symmetric) Method
+    if flag == 3:
+        # Contraction form
+        G = myfunctions.forward_sweep_GS(A, I, A, n)
+        G = myfunctions.backward_sweep_GS(A, I, b, n)
+        while iter < 1000 and rel_err > tol:
+            rel_err = np.linalg.norm(x - x_tilde) / np.linalg.norm(x_tilde)
+            rel_err_arr.append(rel_err)
 
+            # Iteration update
+            x = myfunctions.forward_sweep_GS(A, x, b, n)
+            x = myfunctions.backward_sweep_GS(A, x, b, n)
 
-    # Preconditioner
-    P = D - L
+            # Increment iteration counter
+            iter += 1
 
-    # Initial Values
-    x = x0
-    resid_arr = []
-    err_arr = []
-    n = x.size
-
-    # Termination criterion
-    max_iter = 1000
-    tol = 1e-6
-    iter = 0
-
-    for _ in range(max_iter):
-        # Compute residual
-        r = b - np.dot(A, x)
-        resid_arr.append(np.linalg.norm(r))
-
-        err = np.subtract(x_tilde, x)
-        err_norm = np.linalg.norm(err)
-        err_arr.append(err_norm)
-
-        if err_norm / np.linalg.norm(err) < tol:  # Convergence check
-            break
-
-        # Jacobi iteration update
-        delta_x = myfunctions.lower_solve(P, r, n)
-        x += delta_x
-
-        iter += 1
-
-    return x, iter, resid_arr, err_arr
+    return x, G, iter, rel_err_arr
 
 
 """
@@ -115,6 +88,7 @@ def part_2_driver(choice):
             [7, 4, 1],
             [-1, 1, 2]
         ])
+
     if choice == 1:
         A = np.array([
             [3, 0, 4],
@@ -171,15 +145,19 @@ def part_2_driver(choice):
             [0, 0, 0, 0, -1, 2, -1],
             [0, 0, 0, 0, 0, -1, 2]
         ])
-
     return A
 
-
-A= part_2_driver(0)
+A = part_2_driver(7)
 print(A)
-x_tilde = np.random.uniform(-10, 10, 3)
-x0 = np.ones(3)
+x_tilde = np.random.uniform(-10, 10, 7)
+print("x_tilde", x_tilde)
+x0 = np.ones(7)
 b = np.dot(A, x_tilde)
-x, iter, resid_arr, err_arr, err_ratio = jacobi_iteration(A, x_tilde, x0, b)
+x, G, iter_num, rel_err_list = stationary_method(A, x_tilde, x0, b, 1)
+G_norm = np.linalg.norm(G)
+G_eigen = np.linalg.eigvals(G)
+G_spectral = np.max(np.abs(G_eigen))
 print(x)
-print(iter)
+print(iter_num)
+print(G_norm)
+print(G_spectral)

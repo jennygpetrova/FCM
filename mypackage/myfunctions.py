@@ -74,8 +74,14 @@ def lower_solve(A, b, n):
     # Forward substitution to solve Ly = b for y (where L is stored in A)
     y = np.zeros(n)
     y[0] = b[0]
-    for i in range(1, n):
-        y[i] = b[i] - np.dot(A[i, :i], y[:i])
+    #for i in range(1, n):
+    #    y[i] = b[i] - np.dot(A[i, :i], y[:i])
+
+    for i in range(n):
+        if A[i, i] == 0:
+            raise ValueError(f"Zero diagonal element encountered at index {i}, cannot solve.")
+        # Compute the ith element of x
+        y[i] = (b[i] - np.dot(A[i, :i], y[:i])) / A[i, i]
 
     return y
 
@@ -86,6 +92,25 @@ def upper_solve(A, y, n):
     for i in range(n - 2, -1, -1):
         x[i] = (y[i] - np.dot(A[i, i + 1:n], x[i + 1:n])) / A[i, i]
 
+    return x
+
+def forward_sweep_GS(A, x, b, n):
+    for i in range(n):
+        sum = 0
+        for j in range(n):
+            if j != i:
+                sum += A[i, j] * x[j]
+        x[i] =  (b[i] - sum) / A[i, i]
+        #x[i] = (b[i] - np.dot(A[i, :i], x[:i]) - np.dot(A[i, i + 1:], x[i + 1:])) / A[i, i]
+    return x
+
+def backward_sweep_GS(A, x, b,n):
+    for i in range(n -1, -1, -1):
+        sum = 0
+        for j in range(n -1, -1, -1):
+            if j != i:
+                sum += A[i, j] * x[j]
+        x[i] = (b[i] - sum) / A[i, i]
     return x
 
 # Check factorization accuracy

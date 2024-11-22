@@ -1,7 +1,9 @@
 import numpy as np
+import matplotlib.pyplot as plt
+np.random.seed(1234)
 
 """
--------------------- Functions for Iterative Methods --------------------
+-------------------- Routines for Iterative Methods --------------------
 """
 
 # Richardson's First Order Stationary Method
@@ -152,6 +154,7 @@ def conjugate_gradient(A, x_tilde, x0, b):
 
     return x, iter, resid_arr, err_arr, err_ratio
 
+
 """
 -------------------- Routine to Generate Test Matrices --------------------
 """
@@ -190,6 +193,7 @@ def part_1_driver(choice, n, lmin, lmax):
 
     return np.array(eigenvalues)
 
+
 """
 -------------------- Driver --------------------
 """
@@ -199,8 +203,8 @@ def get_user_inputs():
     nmax = int(input("Maximum value: "))
 
     print("\nEnter range to generate random values for solution vector and initial guess vector:")
-    dmin = float(input("Minimum value: "))
-    dmax = float(input("Maximum value: "))
+    xmin = float(input("Minimum value: "))
+    xmax = float(input("Maximum value: "))
 
     print("\nChoose Minimum and Maximum for Eigenvalues (Must be positive): ")
     lmin = float(input("Enter lambda min: "))
@@ -214,10 +218,11 @@ def get_user_inputs():
     print("5. Eigenvalues chosen from a Normal Distribution, specified min lambda and max lambda")
     choice = int(input("Enter problem type: "))
 
-    return nmin, nmax, dmin, dmax, lmin, lmax, choice
+    return nmin, nmax, xmin, xmax, lmin, lmax, choice
 
-nmin, nmax, dmin, dmax, lmin, lmax, choice = get_user_inputs()
+nmin, nmax, xmin, xmax, lmin, lmax, choice = get_user_inputs()
 
+# Generate arrays to store test values
 ndim = []
 
 RF_x = []
@@ -238,40 +243,45 @@ CG_res = []
 CG_err = []
 CG_ratio = []
 
-for n in range(nmin, nmax + 1):
-    ndim.append(n)
-    x_tilde = np.random.uniform(dmin, dmax, n)
-    x0 = np.random.uniform(dmin, dmax, n)
+# Run tests on range of dimensions, based on selected test matrix
+def test_range_n(nmin, nmax):
+    for n in range(nmin, nmax + 1, 10):
+        ndim.append(n)
+        x_tilde = np.random.uniform(xmin, xmax, n)
+        x0 = np.random.uniform(xmin, xmax, n)
 
-    print("\nSolution Vector x_tilde = ", x_tilde)
-    print("\nInitial Guess Vector x0 = ", x0)
+        print("\nSolution Vector x_tilde = ", x_tilde)
+        print("\nInitial Guess Vector x0 = ", x0)
 
-    # Generate diagonal matrix stored as a vector of eigenvalues
-    A = part_1_driver(choice, n, lmin, lmax)
-    print("\nDiagonal Matrix A (as vector): ", A)
+        # Generate diagonal matrix stored as a vector of eigenvalues
+        A = part_1_driver(choice, n, lmin, lmax)
+        print("\nDiagonal Matrix A (as vector): ", A)
 
-    # Compute b_tilde
-    b_tilde = A * x_tilde
-    print("\nb_tilde = A * x_tilde: ", b_tilde)
+        # Compute b_tilde
+        b_tilde = A * x_tilde
+        print("\nb_tilde = A * x_tilde: ", b_tilde)
 
-    # Richardson's Stationary Method
-    x_RF, iter_RF, resid_arr_RF, err_arr_RF, err_ratio_RF = richardsons_stationary(A, x_tilde, x0, b_tilde)
-    print("\nRF Solution Vector: ", x_RF)
-    print("Number of Iterations (RF): ", iter_RF)
-    RF_iter.append(iter_RF)
+        # Richardson's Stationary Method
+        x_RF, iter_RF, resid_arr_RF, err_arr_RF, err_ratio_RF = richardsons_stationary(A, x_tilde, x0, b_tilde)
+        print("\nRF Solution Vector: ", x_RF)
+        print("Number of Iterations (RF): ", iter_RF)
+        RF_iter.append(iter_RF)
 
-    # Steepest Descent Method
-    x_SD, iter_SD, resid_arr_SD, err_arr_SD, err_ratio_SD = steepest_descent(A, x_tilde, x0, b_tilde)
-    print("\nSD Solution Vector: ", x_SD)
-    print("Number of Iterations (SD): ", iter_SD)
-    SD_iter.append(iter_SD)
+        # Steepest Descent Method
+        x_SD, iter_SD, resid_arr_SD, err_arr_SD, err_ratio_SD = steepest_descent(A, x_tilde, x0, b_tilde)
+        print("\nSD Solution Vector: ", x_SD)
+        print("Number of Iterations (SD): ", iter_SD)
+        SD_iter.append(iter_SD)
 
-    # Conjugate Gradient Method
-    x_CG, iter_CG, resid_arr_CG, err_arr_CG, err_ratio_CG = conjugate_gradient(A, x_tilde, x0, b_tilde)
-    print("\nCG Solution Vector: ", x_CG)
-    print("Number of Iterations (CG): ", iter_CG)
-    CG_iter.append(iter_CG)
+        # Conjugate Gradient Method
+        x_CG, iter_CG, resid_arr_CG, err_arr_CG, err_ratio_CG = conjugate_gradient(A, x_tilde, x0, b_tilde)
+        print("\nCG Solution Vector: ", x_CG)
+        print("Number of Iterations (CG): ", iter_CG)
+        CG_iter.append(iter_CG)
 
+
+'''
+test_range_n(nmin, nmax)
 # Compute condition number and convergence bounds
 kappa = np.max(A) / np.min(A)
 bound_RF_SD = (kappa - 1) / (kappa + 1)
@@ -279,9 +289,21 @@ bound_CG = (np.sqrt(kappa) - 1) / (np.sqrt(kappa) + 1)
 print(f"\nCondition Number (kappa): {kappa:.2f}")
 print(f"Bound for RF/SD Convergence Rate: {bound_RF_SD:.4f}")
 print(f"Bound for CG Convergence Rate: {bound_CG:.4f}")
-
+'''
 
 
 """
 -------------------- Plots and Graphs --------------------
 """
+# Compare convergence of error terms for each method, for several dimensions n
+plt.plot(ndim, RF_iter, color='g', label='RF')
+plt.plot(ndim, SD_iter, color='b', label='SD')
+plt.plot(ndim, CG_iter, color='y', label='CG')
+plt.xlabel('Dimension n')
+plt.ylabel('Number of Iterations Until Convergence')
+plt.title('Iterations until Convergence of RF, SD, and CG for Matrix Type {}'.format(choice))
+plt.legend()
+plt.show()
+plt.savefig('type{}.png'.format(choice))
+
+
