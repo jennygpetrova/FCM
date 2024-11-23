@@ -1,11 +1,11 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import time
 np.random.seed(1234)
 
 """
 -------------------- Routines for Iterative Methods --------------------
 """
-
 # Richardson's First Order Stationary Method
 def richardsons_stationary(A, x_tilde, x0, b):
     # Optimal alpha for diagonal matrix
@@ -195,7 +195,7 @@ def part_1_driver(choice, n, lmin, lmax):
 
 
 """
--------------------- Driver --------------------
+-------------------- Input Collection --------------------
 """
 def get_user_inputs():
     print("\nEnter range of dimensions to generate (nxn) matrix A: ")
@@ -220,90 +220,148 @@ def get_user_inputs():
 
     return nmin, nmax, xmin, xmax, lmin, lmax, choice
 
-nmin, nmax, xmin, xmax, lmin, lmax, choice = get_user_inputs()
+"""
+-------------------- Helper Functions --------------------
+"""
+def run_methods(A, x_tilde, x0, b_tilde):
+    # Run all methods and collect results
+    results = {}
+    results['RF'] = richardsons_stationary(A, x_tilde, x0, b_tilde)
+    results['SD'] = steepest_descent(A, x_tilde, x0, b_tilde)
+    results['CG'] = conjugate_gradient(A, x_tilde, x0, b_tilde)
+    return results
 
-# Generate arrays to store test values
-ndim = []
+def plot_convergence(ndim, RF_iter_avg, SD_iter_avg, CG_iter_avg, choice):
+    # Compare iterations until convergence
+    plt.plot(ndim, RF_iter_avg, color='g', label='RF')
+    plt.plot(ndim, SD_iter_avg, color='b', label='SD')
+    plt.plot(ndim, CG_iter_avg, color='y', label='CG')
+    plt.xlabel('Dimension n')
+    plt.ylabel('Number of Iterations Until Convergence')
+    plt.title(f'Iterations Until Convergence for Matrix Type {choice}')
+    plt.legend()
+    plt.savefig(f'type{choice}_iterations.png', dpi=300, bbox_inches='tight')
+    plt.show()
 
-RF_x = []
-RF_iter = []
-RF_res = []
-RF_err = []
-RF_ratio = []
+def plot_runtime_comparison(nmin, nmax, runtimes_RF_avg, runtimes_SD_avg, runtimes_CG_avg, choice):
+    # Use the same step size as the runtime calculations
+    dimensions = range(nmin, nmax + 1, 10)
 
-SD_x = []
-SD_iter = []
-SD_res = []
-SD_err = []
-SD_ratio = []
+    # Plot runtimes for each method
+    plt.plot(dimensions, runtimes_RF_avg, label='RF Runtime', color='g')
+    plt.plot(dimensions, runtimes_SD_avg, label='SD Runtime', color='b')
+    plt.plot(dimensions, runtimes_CG_avg, label='CG Runtime', color='y')
+    plt.xlabel('Dimension n')
+    plt.ylabel('Runtime (seconds)')
+    plt.title(f'Runtime Comparison for RF, SD, and CG Methods (Type {choice})')
+    plt.legend()
+    plt.savefig(f'runtime_comparison_{choice}.png', dpi=300, bbox_inches='tight')
+    plt.show()
 
-CG_x = []
-CG_iter = []
-CG_res = []
-CG_err = []
-CG_ratio = []
 
-# Run tests on range of dimensions, based on selected test matrix
-def test_range_n(nmin, nmax):
+def plot_error_ratios(error_ratios, kappa_list, method, nmin, choice):
+    # Error ratio plots for RF, SD, or CG
+    fig, axes = plt.subplots(5, 2, figsize=(15, 20))
+    axes = axes.flatten()
+    for i, ax in enumerate(axes):
+        if i >= len(error_ratios):  # Avoid IndexError
+            break
+        ax.plot(range(len(error_ratios[i])), error_ratios[i], label="Error Ratio")
+        if method == 'CG':
+            bound = (np.sqrt(kappa_list[i]) - 1) / (np.sqrt(kappa_list[i]) + 1)
+        else:
+            bound = (kappa_list[i] - 1) / (kappa_list[i] + 1)
+        ax.axhline(bound, color='r', linestyle='--', label="Convergence Bound")
+        ax.set_title(f"{method}: Dimension = {(nmin + i * 10)}")
+        ax.set_xlabel("Iterations")
+        ax.set_ylabel("Error Ratio")
+        ax.legend()
+    plt.tight_layout()
+    plt.savefig(f"{method}_error_ratio_{choice}.png", dpi=300)
+    plt.show()
+
+"""
+-------------------- Main Routine --------------------
+"""
+def main():
+    nmin, nmax, xmin, xmax, lmin, lmax, choice = get_user_inputs()
+
+    ndim = []
+    RF_iter_avg = []
+    SD_iter_avg = []
+    CG_iter_avg = []
+    runtimes_RF_avg = []
+    runtimes_SD_avg = []
+    runtimes_CG_avg = []
+    RF_err_ratio = []
+    SD_err_ratio = []
+    CG_err_ratio = []
+    kappa_list = []
+
+    # Iterating through dimensions
     for n in range(nmin, nmax + 1, 10):
+        RF_iter = []
+        SD_iter = []
+        CG_iter = []
+        runtimes_RF = []
+        runtimes_SD = []
+        runtimes_CG = []
         ndim.append(n)
-        x_tilde = np.random.uniform(xmin, xmax, n)
-        x0 = np.random.uniform(xmin, xmax, n)
 
-        print("\nSolution Vector x_tilde = ", x_tilde)
-        print("\nInitial Guess Vector x0 = ", x0)
+        # Generate random inputs
+        for _ in range(3):
+            x_tilde = np.random.uniform(xmin, xmax, n)
+            x0 = np.random.uniform(xmin, xmax, n)
+            A = part_1_driver(choice, n, lmin, lmax)
+            b_tilde = A * x_tilde
+            kappa = np.max(A) / np.min(A)
+            kappa_list.append(kappa)
 
-        # Generate diagonal matrix stored as a vector of eigenvalues
-        A = part_1_driver(choice, n, lmin, lmax)
-        print("\nDiagonal Matrix A (as vector): ", A)
+            # Measure runtimes and solve
+            start = time.time()
+            res_RF = richardsons_stationary(A, x_tilde, x0, b_tilde)
+            runtimes_RF.append(time.time() - start)
 
-        # Compute b_tilde
-        b_tilde = A * x_tilde
-        print("\nb_tilde = A * x_tilde: ", b_tilde)
+            start = time.time()
+            res_SD = steepest_descent(A, x_tilde, x0, b_tilde)
+            runtimes_SD.append(time.time() - start)
 
-        # Richardson's Stationary Method
-        x_RF, iter_RF, resid_arr_RF, err_arr_RF, err_ratio_RF = richardsons_stationary(A, x_tilde, x0, b_tilde)
-        print("\nRF Solution Vector: ", x_RF)
-        print("Number of Iterations (RF): ", iter_RF)
-        RF_iter.append(iter_RF)
+            start = time.time()
+            res_CG = conjugate_gradient(A, x_tilde, x0, b_tilde)
+            runtimes_CG.append(time.time() - start)
 
-        # Steepest Descent Method
-        x_SD, iter_SD, resid_arr_SD, err_arr_SD, err_ratio_SD = steepest_descent(A, x_tilde, x0, b_tilde)
-        print("\nSD Solution Vector: ", x_SD)
-        print("Number of Iterations (SD): ", iter_SD)
-        SD_iter.append(iter_SD)
+            # Append iteration counts and error ratios
+            RF_iter.append(res_RF[1])
+            SD_iter.append(res_SD[1])
+            CG_iter.append(res_CG[1])
+            RF_err_ratio.append(res_RF[4])
+            SD_err_ratio.append(res_SD[4])
+            CG_err_ratio.append(res_CG[4])
 
-        # Conjugate Gradient Method
-        x_CG, iter_CG, resid_arr_CG, err_arr_CG, err_ratio_CG = conjugate_gradient(A, x_tilde, x0, b_tilde)
-        print("\nCG Solution Vector: ", x_CG)
-        print("Number of Iterations (CG): ", iter_CG)
-        CG_iter.append(iter_CG)
+        # Compute averages
+        RF_iter_avg.append(np.mean(RF_iter))
+        SD_iter_avg.append(np.mean(SD_iter))
+        CG_iter_avg.append(np.mean(CG_iter))
+        runtimes_RF_avg.append(np.mean(runtimes_RF))
+        runtimes_SD_avg.append(np.mean(runtimes_SD))
+        runtimes_CG_avg.append(np.mean(runtimes_CG))
 
-
-'''
-test_range_n(nmin, nmax)
-# Compute condition number and convergence bounds
-kappa = np.max(A) / np.min(A)
-bound_RF_SD = (kappa - 1) / (kappa + 1)
-bound_CG = (np.sqrt(kappa) - 1) / (np.sqrt(kappa) + 1)
-print(f"\nCondition Number (kappa): {kappa:.2f}")
-print(f"Bound for RF/SD Convergence Rate: {bound_RF_SD:.4f}")
-print(f"Bound for CG Convergence Rate: {bound_CG:.4f}")
-'''
+    # Generate plots
+    plot_convergence(ndim, RF_iter_avg, SD_iter_avg, CG_iter_avg, choice)
+    plot_runtime_comparison(nmin, nmax, runtimes_RF_avg, runtimes_SD_avg, runtimes_CG_avg, choice)
+    plot_error_ratios(RF_err_ratio, kappa_list, 'RF', nmin, choice)
+    plot_error_ratios(SD_err_ratio, kappa_list, 'SD', nmin, choice)
+    plot_error_ratios(CG_err_ratio, kappa_list, 'CG', nmin, choice)
 
 
-"""
--------------------- Plots and Graphs --------------------
-"""
-# Compare convergence of error terms for each method, for several dimensions n
-plt.plot(ndim, RF_iter, color='g', label='RF')
-plt.plot(ndim, SD_iter, color='b', label='SD')
-plt.plot(ndim, CG_iter, color='y', label='CG')
-plt.xlabel('Dimension n')
-plt.ylabel('Number of Iterations Until Convergence')
-plt.title('Iterations until Convergence of RF, SD, and CG for Matrix Type {}'.format(choice))
-plt.legend()
-plt.show()
-plt.savefig('type{}.png'.format(choice))
+if __name__ == "__main__":
+    main()
+
+
+
+
+
+
+
 
 
