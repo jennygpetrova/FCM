@@ -221,18 +221,9 @@ def get_user_inputs():
     return nmin, nmax, xmin, xmax, lmin, lmax, choice
 
 """
--------------------- Helper Functions --------------------
+-------------------- Functions for Generating Results --------------------
 """
-def run_methods(A, x_tilde, x0, b_tilde):
-    # Run all methods and collect results
-    results = {}
-    results['RF'] = richardsons_stationary(A, x_tilde, x0, b_tilde)
-    results['SD'] = steepest_descent(A, x_tilde, x0, b_tilde)
-    results['CG'] = conjugate_gradient(A, x_tilde, x0, b_tilde)
-    return results
-
 def plot_convergence(ndim, RF_iter_avg, SD_iter_avg, CG_iter_avg, choice):
-    # Compare iterations until convergence
     plt.plot(ndim, RF_iter_avg, color='g', label='RF')
     plt.plot(ndim, SD_iter_avg, color='b', label='SD')
     plt.plot(ndim, CG_iter_avg, color='y', label='CG')
@@ -243,14 +234,11 @@ def plot_convergence(ndim, RF_iter_avg, SD_iter_avg, CG_iter_avg, choice):
     plt.savefig(f'type{choice}_iterations.png', dpi=300, bbox_inches='tight')
     plt.show()
 
-def plot_runtime_comparison(nmin, nmax, runtimes_RF_avg, runtimes_SD_avg, runtimes_CG_avg, choice):
-    # Use the same step size as the runtime calculations
-    dimensions = range(nmin, nmax + 1, 10)
-
+def plot_runtimes(ndim, time_RF_avg, time_SD_avg, time_CG_avg, choice):
     # Plot runtimes for each method
-    plt.plot(dimensions, runtimes_RF_avg, label='RF Runtime', color='g')
-    plt.plot(dimensions, runtimes_SD_avg, label='SD Runtime', color='b')
-    plt.plot(dimensions, runtimes_CG_avg, label='CG Runtime', color='y')
+    plt.plot(ndim, time_RF_avg, label='RF Runtime', color='g')
+    plt.plot(ndim, time_SD_avg, label='SD Runtime', color='b')
+    plt.plot(ndim, time_CG_avg, label='CG Runtime', color='y')
     plt.xlabel('Dimension n')
     plt.ylabel('Runtime (seconds)')
     plt.title(f'Runtime Comparison for RF, SD, and CG Methods (Type {choice})')
@@ -259,26 +247,29 @@ def plot_runtime_comparison(nmin, nmax, runtimes_RF_avg, runtimes_SD_avg, runtim
     plt.show()
 
 
-def plot_error_ratios(error_ratios, kappa_list, method, nmin, choice):
-    # Error ratio plots for RF, SD, or CG
-    fig, axes = plt.subplots(5, 2, figsize=(15, 20))
-    axes = axes.flatten()
-    for i, ax in enumerate(axes):
-        if i >= len(error_ratios):  # Avoid IndexError
-            break
-        ax.plot(range(len(error_ratios[i])), error_ratios[i], label="Error Ratio")
-        if method == 'CG':
-            bound = (np.sqrt(kappa_list[i]) - 1) / (np.sqrt(kappa_list[i]) + 1)
-        else:
-            bound = (kappa_list[i] - 1) / (kappa_list[i] + 1)
-        ax.axhline(bound, color='r', linestyle='--', label="Convergence Bound")
-        ax.set_title(f"{method}: Dimension = {(nmin + i * 10)}")
-        ax.set_xlabel("Iterations")
-        ax.set_ylabel("Error Ratio")
-        ax.legend()
-    plt.tight_layout()
-    plt.savefig(f"{method}_error_ratio_{choice}.png", dpi=300)
+def plot_error_ratios(ndim, error_ratios, kappa, method, choice):
+    # Calculate the convergence bound
+    if method == 3:
+        bound = [(np.sqrt(kappa) - 1) / (np.sqrt(kappa) + 1)]
+    else:
+        bound = [(kappa - 1) / (kappa + 1)]
+
+    # Create the plot
+    plt.figure(figsize=(8, 6))
+    plt.plot(range(len(error_ratios)), error_ratios, label="Error Ratio", color='b')
+    plt.axhline(y=kappa, linestyle='--', color='b')
+
+    # Add labels, title, and legend
+    plt.xlabel("Iterations")
+    plt.ylabel("Error Ratio")
+    plt.title(f"Error Ratio for {method} (Dimension = {ndim})")
+    plt.legend()
+    plt.grid(True)
+
+    # Save and show the plot
+    plt.savefig(f'error_ratios_{method}_{choice}_{ndim}.png', dpi=300, bbox_inches='tight')
     plt.show()
+
 
 """
 -------------------- Main Routine --------------------
@@ -286,72 +277,27 @@ def plot_error_ratios(error_ratios, kappa_list, method, nmin, choice):
 def main():
     nmin, nmax, xmin, xmax, lmin, lmax, choice = get_user_inputs()
 
-    ndim = []
-    RF_iter_avg = []
-    SD_iter_avg = []
-    CG_iter_avg = []
-    runtimes_RF_avg = []
-    runtimes_SD_avg = []
-    runtimes_CG_avg = []
-    RF_err_ratio = []
-    SD_err_ratio = []
-    CG_err_ratio = []
-    kappa_list = []
-
-    # Iterating through dimensions
     for n in range(nmin, nmax + 1, 10):
-        RF_iter = []
-        SD_iter = []
-        CG_iter = []
-        runtimes_RF = []
-        runtimes_SD = []
-        runtimes_CG = []
-        ndim.append(n)
+        A = part_1_driver(choice, n, lmin, lmax)
+        x_tilde = np.random.uniform(xmin, xmax, n)
+        x0 = np.random.uniform(xmin, xmax, n)
+        b = A * x_tilde
+        kappa = np.max(A) / np.min(A)
 
-        # Generate random inputs
-        for _ in range(3):
-            x_tilde = np.random.uniform(xmin, xmax, n)
-            x0 = np.random.uniform(xmin, xmax, n)
-            A = part_1_driver(choice, n, lmin, lmax)
-            b_tilde = A * x_tilde
-            kappa = np.max(A) / np.min(A)
-            kappa_list.append(kappa)
+        for i in (1,4):
+            if i == 1:
+                x, iter, resid_arr, err_arr, err_ratio = richardsons_stationary(A, x_tilde, x0, b)
+                plot_error_ratios(n, err_ratio, kappa, i, choice)
+            if i == 2:
+                x, iter, resid_arr, err_arr, err_ratio = steepest_descent(A, x_tilde, x0, b)
+                plot_error_ratios(n, err_ratio, kappa, i, choice)
+            if i == 3:
+                x, iter, resid_arr, err_arr, err_ratio = conjugate_gradient(A, x_tilde, x0, b)
+                plot_error_ratios(n, err_ratio, kappa, i, choice)
 
-            # Measure runtimes and solve
-            start = time.time()
-            res_RF = richardsons_stationary(A, x_tilde, x0, b_tilde)
-            runtimes_RF.append(time.time() - start)
 
-            start = time.time()
-            res_SD = steepest_descent(A, x_tilde, x0, b_tilde)
-            runtimes_SD.append(time.time() - start)
 
-            start = time.time()
-            res_CG = conjugate_gradient(A, x_tilde, x0, b_tilde)
-            runtimes_CG.append(time.time() - start)
 
-            # Append iteration counts and error ratios
-            RF_iter.append(res_RF[1])
-            SD_iter.append(res_SD[1])
-            CG_iter.append(res_CG[1])
-            RF_err_ratio.append(res_RF[4])
-            SD_err_ratio.append(res_SD[4])
-            CG_err_ratio.append(res_CG[4])
-
-        # Compute averages
-        RF_iter_avg.append(np.mean(RF_iter))
-        SD_iter_avg.append(np.mean(SD_iter))
-        CG_iter_avg.append(np.mean(CG_iter))
-        runtimes_RF_avg.append(np.mean(runtimes_RF))
-        runtimes_SD_avg.append(np.mean(runtimes_SD))
-        runtimes_CG_avg.append(np.mean(runtimes_CG))
-
-    # Generate plots
-    plot_convergence(ndim, RF_iter_avg, SD_iter_avg, CG_iter_avg, choice)
-    plot_runtime_comparison(nmin, nmax, runtimes_RF_avg, runtimes_SD_avg, runtimes_CG_avg, choice)
-    plot_error_ratios(RF_err_ratio, kappa_list, 'RF', nmin, choice)
-    plot_error_ratios(SD_err_ratio, kappa_list, 'SD', nmin, choice)
-    plot_error_ratios(CG_err_ratio, kappa_list, 'CG', nmin, choice)
 
 
 if __name__ == "__main__":
