@@ -283,43 +283,44 @@ def plot_errs_and_resids(ndim, err_array, resid_array, method, choice):
     plt.grid(True)
 
     # Save and show the plot
-    plt.savefig(f'error_ratios_{method}_{choice}_{ndim}.png', dpi=300, bbox_inches='tight')
+    plt.savefig(f'errrors_and_residuals_{method}_{choice}_{ndim}.png', dpi=300, bbox_inches='tight')
     plt.show()
 
 
 """
 -------------------- Main Routine --------------------
 """
-nmin, nmax, step, xmin, xmax, lmin, lmax, choice = get_user_inputs()
-ndim = []
+# nmin, nmax, step, xmin, xmax, lmin, lmax, choice = get_user_inputs()
+ndim = [10, 50, 100]
+xmin = -100
+xmax = 100
+lmin = 1
+lmax = 100
 RF_iter_avg = []
 SD_iter_avg = []
 CG_iter_avg = []
 
-'''for n in range(nmin, nmax + 1, step):
-    ndim.append(n)
-    A = matrix_type_diag(choice, n, lmin, lmax)
-    x_tilde = np.random.uniform(xmin, xmax, n)
-    x0 = np.random.uniform(xmin, xmax, n)
-    b = A * x_tilde
-    kappa = np.max(A) / np.min(A)
+for choice in range(1,6):
+    for n in ndim:
+        A = matrix_type_diag(choice, n, lmin, lmax)
+        x_tilde = np.random.uniform(xmin, xmax, n)
+        x0 = np.random.uniform(xmin, xmax, n)
+        b = A * x_tilde
+        kappa = np.max(A) / np.min(A)
 
 
-    x1, iter1, resid_arr1, err_arr1, err_ratio1 = richardsons_stationary(A, x_tilde, x0, b)
-    plot_error_ratios(n, err_ratio1, kappa, 'RF', choice)
-    plot_errs_and_resids(n, err_arr1, resid_arr1, 'RF', choice)
-    x2, iter2, resid_arr2, err_arr2, err_ratio2 = steepest_descent(A, x_tilde, x0, b)
-    plot_error_ratios(n, err_ratio2, kappa, 'SD', choice)
-    plot_errs_and_resids(n, err_arr2, resid_arr2, 'SD', choice)
-    x3, iter3, resid_arr3, err_arr3, err_ratio3 = conjugate_gradient(A, x_tilde, x0, b)
-    plot_error_ratios(n, err_ratio3, kappa, 'CG', choice)
-    plot_errs_and_resids(n, err_arr3, resid_arr3, 'CG', choice)
+        x1, iter1, resid_arr1, err_arr1, err_ratio1 = richardsons_stationary(A, x_tilde, x0, b)
+        plot_error_ratios(n, err_ratio1, kappa, 'RF', choice)
+        plot_errs_and_resids(n, err_arr1, resid_arr1, 'RF', choice)
+        x2, iter2, resid_arr2, err_arr2, err_ratio2 = steepest_descent(A, x_tilde, x0, b)
+        plot_error_ratios(n, err_ratio2, kappa, 'SD', choice)
+        plot_errs_and_resids(n, err_arr2, resid_arr2, 'SD', choice)
+        x3, iter3, resid_arr3, err_arr3, err_ratio3 = conjugate_gradient(A, x_tilde, x0, b)
+        plot_error_ratios(n, err_ratio3, kappa, 'CG', choice)
+        plot_errs_and_resids(n, err_arr3, resid_arr3, 'CG', choice)
 
-    RF_iter = []
-    SD_iter = []
-    CG_iter = []'''
 
-for n in range(nmin, nmax + 1, step):
+"""for n in range(nmin, nmax + 1, step):
     RF_iter = []
     SD_iter = []
     CG_iter = []
@@ -342,7 +343,7 @@ for n in range(nmin, nmax + 1, step):
     SD_iter_avg.append(np.average(SD_iter))
     CG_iter_avg.append(np.average(CG_iter))
 
-plot_convergence(ndim, RF_iter_avg, SD_iter_avg, CG_iter_avg, choice)
+plot_convergence(ndim, RF_iter_avg, SD_iter_avg, CG_iter_avg, choice)"""
 
 
 
