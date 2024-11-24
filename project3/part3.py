@@ -1,5 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import pandas as pd
+import time
 from mypackage import myfunctions
 
 """
@@ -11,7 +13,7 @@ def sparse_matrix(n):
     for i in range(n):
         for j in range(n):
             if i > j:
-                x = np.random.choice([0, 0, 1])
+                x = np.random.choice([0, 0, 0, 1])
                 if x == 1:
                     # Scale each row to ensure diagonal dominance
                     L[i][j] = np.round(np.random.randint(1, 10) / i, 3)
@@ -72,14 +74,14 @@ def get_lower_upper_sparse(AA, JA, IA):
                 U[i] += AA[k]
     return L, U
 
-def plot_convergence(rel_err_arr):
+"""def plot_convergence(rel_err_arr):
     plt.plot(rel_err_arr)
     plt.yscale('log')
     plt.xlabel('Iteration')
     plt.ylabel('Relative Error (log scale)')
     plt.title('Convergence of Stationary Method')
     plt.grid(True)
-    plt.show()
+    plt.show()"""
 
 def stationary_method(matrix_representation, x_tilde, x0, b, flag):
     if isinstance(matrix_representation, tuple):  # CSR format
@@ -93,6 +95,7 @@ def stationary_method(matrix_representation, x_tilde, x0, b, flag):
 
     # Initialize variables
     x = x0.astype(float)
+    n = len(x)
     r = b - matrix_vector_multiply(x)
     D = get_diagonal()
     if np.any(D == 0):
@@ -110,51 +113,157 @@ def stationary_method(matrix_representation, x_tilde, x0, b, flag):
 
         if flag == 1:  # Jacobi
             x += r / D
+            r = b - matrix_vector_multiply(x)
+
         elif flag == 2 or flag == 3:  # Gauss-Seidel or Symmetric Gauss-Seidel
-            n = len(x)
             # Forward sweep
-            for i in range(n):
-                row_start = IA[i] if isinstance(matrix_representation, tuple) else 0
-                row_end = IA[i + 1] if isinstance(matrix_representation, tuple) else n
-                sigma = sum(AA[k] * x[JA[k]] for k in range(row_start, row_end) if JA[k] != i)
-                x[i] = (b[i] - sigma) / D[i]
-
-            if flag == 3:  # Backward sweep for symmetric Gauss-Seidel
-                for i in range(len(x) - 1, -1, -1):
-                    row_start = IA[i] if isinstance(matrix_representation, tuple) else 0
-                    row_end = IA[i + 1] if isinstance(matrix_representation, tuple) else n
-                    sigma = sum(AA[k] * x[JA[k]] for k in range(row_start, row_end) if JA[k] != i)
+            if isinstance(matrix_representation, tuple):
+                for i in range(n):
+                    row_start = IA[i]
+                    row_end = IA[i + 1]
+                    sigma = 0
+                    for k in range(row_start, row_end):
+                        j = JA[k]
+                        if j < i:
+                            sigma += AA[k] * x[j]
+                        elif j > i:
+                            sigma += AA[k] * x[j]
                     x[i] = (b[i] - sigma) / D[i]
+            else:
+                x = myfunctions.forward_sweep(A, x, b, n)
 
-        # Update residual
-        r = b - matrix_vector_multiply(x)
+        if flag == 3:  # Backward sweep for symmetric Gauss-Seidel
+            if isinstance(matrix_representation, tuple):
+                for i in range(n - 1, -1, -1):
+                    row_start = IA[i]
+                    row_end = IA[i + 1]
+                    sigma = 0
+                    for k in range(row_start, row_end):
+                        j = JA[k]
+                        if j < i:
+                            sigma += AA[k] * x[j]
+                        elif j > i:
+                            sigma += AA[k] * x[j]
+                    x[i] = (b[i] - sigma) / D[i]
+            else:
+                x = myfunctions.backward_sweep(A, x, b, n)
+
+
         iter += 1
 
     return x, iter, rel_err_arr
 
+def plot_relative_errors(rel_errs, methods, n, type):
+    plt.figure(figsize=(8, 6))
+    for rel_err, method in zip(rel_errs, methods):
+        plt.plot(range(len(rel_err)), rel_err, label=method)
+
+    plt.yscale('log')
+    plt.xlabel('Iterations', fontsize=12)
+    plt.ylabel('Relative Error (log scale)', fontsize=12)
+    plt.title(f"Convergence of Relative Errors for {type} Matrix (n = {n})", fontsize=14)
+    plt.legend(fontsize=10)
+    plt.grid(True)
+    plt.savefig(f'rel_errs_{n}.png', dpi=300, bbox_inches='tight')
+    plt.show()
+
+
+"""
+-------------------- Input Collection --------------------
+"""
+def get_user_inputs():
+    print("\nEnter range of dimensions to generate (nxn) matrix A: ")
+    nmin = int(input("Minimum value: "))
+    nmax = int(input("Maximum value: "))
+    step = int(input("Step size: "))
+
+    print("\nEnter range to generate random values for solution vector and initial guess vector:")
+    xmin = float(input("Minimum value: "))
+    xmax = float(input("Maximum value: "))
+
+
+    return nmin, nmax, step, xmin, xmax
 
 """
 -------------------- Test for Dense and Sparse Matrices --------------------
 """
-n = 5
-A = sparse_matrix(n)
-x_tilde = np.random.randint(1, 10, n)
-x0 = np.random.randint(1, 10, n)
-b = np.dot(A, x_tilde)  # Dense matrix case
+nmin, nmax, step, xmin, xmax = get_user_inputs()
 
-# Dense matrix case
-print("Dense Matrix:")
-print(A)
-x, iter, rel_err_arr = stationary_method(A, x_tilde, x0, b, 1)
-print("Solution:", x)
-print("Iterations:", iter)
-plot_convergence(rel_err_arr)
+for n in range(nmin, nmax + 1, step):
+    results = []  # To store results for all methods for this matrix
+    results_csr = []
+    rel_errs = []  # To store relative errors for all methods
+    rel_errs_csr = []
+    methods = []  # To store method names
 
-# Sparse matrix case
-AA, JA, IA = compressed_row(A)
-print("\nSparse Matrix:")
-x, iter, rel_err_arr = stationary_method((AA, JA, IA), x_tilde, x0, b, 1)
-print("Solution:", x)
-print("Iterations:", iter)
-plot_convergence(rel_err_arr)
+    # Sparse matrix generation
+    A = sparse_matrix(n)
+    # Compressed storage
+    AA, JA, IA = compressed_row(A)
+
+    # Loop through methods
+    for flag in range(1, 4):
+        if flag == 1:
+            method = 'Jacobi'
+        elif flag == 2:
+            method = 'GS'
+        elif flag == 3:
+            method = 'SGS'
+
+        iter_list = []
+        iter_avg = []
+        time_list = []
+        time_avg = []
+        time_list_csr = []
+        time_csr_avg = []
+
+        # Run the method multiple times to average results
+        for j in range(5):
+            x_tilde = np.random.uniform(-10, 10, n)
+            x0 = np.random.uniform(-10, 10, n)
+
+            # Sparse matrix multiplication
+            b = np.dot(A, x_tilde)
+            # Time for sparse matrix to converge
+            start_time = time.time()
+            x, iter_num, rel_err_arr = stationary_method(A, x_tilde, x0, b, flag)
+            end_time = time.time()
+            time_list.append(end_time - start_time)
+            iter_list.append(iter_num)
+
+            # Compressed matrix multiplication
+            b_csr = csr_multiply(AA, JA, IA, x_tilde)
+            start_time = time.time()
+            x_csr, iter_csr, rel_err_csr = stationary_method((AA, JA, IA), x_tilde, x0, b_csr, flag)
+            end_time = time.time()
+            time_list_csr.append(end_time - start_time)
+
+        # Compute averages
+        iter_avg = np.average(iter_list)
+        time_avg = np.average(time_list)
+        time_csr_avg = np.average(time_list_csr)
+
+        # Append results for this method to the list
+        results.append((method, iter_avg, time_avg, time_csr_avg))
+
+        # Collect relative errors and method name for plotting
+        rel_errs.append(rel_err_arr)
+        rel_errs_csr.append(rel_err_csr)
+        methods.append(method)
+
+    # Plot relative errors for this method
+    plot_relative_errors(rel_errs, methods, n, 'Sparse')
+    plot_relative_errors(rel_errs_csr, methods, n, 'Compressed')
+
+    # Create a DataFrame for this matrix
+    df = pd.DataFrame(results, columns=['Method', 'Iterations', 'Sparse Time', 'Compressed Time'])
+
+    # Print and save the results for this matrix
+    print(f"Comparing Convergence Times for Sparse vs Compressed Row Storage(n = {n}):\n")
+    print(df)
+    print("\n")
+    df.to_csv(f'Results_Matrix_{n}.csv', index=False)
+
+
+
 

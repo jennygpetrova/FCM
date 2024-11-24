@@ -1,6 +1,5 @@
 import numpy as np
 import matplotlib.pyplot as plt
-import time
 np.random.seed(1234)
 
 """
@@ -47,7 +46,7 @@ def richardsons_stationary(A, x_tilde, x0, b):
         # Keep error term at current step after calculating error ratio
         err = err_next
 
-        # Increment iteration counter
+        # Count iterations
         iter += 1
 
     return x, iter, resid_arr, err_arr, err_ratio
@@ -95,7 +94,7 @@ def steepest_descent(A, x_tilde, x0, b):
         # Keep error term at current step after calculating error ratio
         err_A_norm = err_A_norm_next
 
-        # Increment iteration counter
+        # Count Iterations
         iter += 1
 
     return x, iter, resid_arr, err_arr, err_ratio
@@ -146,9 +145,10 @@ def conjugate_gradient(A, x_tilde, x0, b):
         err_arr.append(err_A_norm)
         err_ratio.append(err_A_norm / err_A_norm_0)
 
-        # Keep error term and sigma term at current step
+        # Keep sigma term at current step
         sigma = sigma_next
 
+        # Count iterations
         iter += 1
 
     return x, iter, resid_arr, err_arr, err_ratio
@@ -160,8 +160,8 @@ def conjugate_gradient(A, x_tilde, x0, b):
 def matrix_type_diag(choice, n, lmin, lmax):
     # All eigenvalues the same
     if choice == 1:
-        lrand = np.random.randint(lmin, lmax)
-        eigenvalues = np.full(n, lrand)
+        k = np.random.randint(lmin, lmax)
+        eigenvalues = np.full(n, k)
 
     # k distinct eigenvalues with randomly chosen multiplicities
     elif choice == 2:
@@ -201,6 +201,7 @@ def get_user_inputs():
     print("\nEnter range of dimensions to generate (nxn) matrix A: ")
     nmin = int(input("Minimum value: "))
     nmax = int(input("Maximum value: "))
+    step = int(input("Step size: "))
 
     print("\nEnter range to generate random values for solution vector and initial guess vector:")
     xmin = float(input("Minimum value: "))
@@ -218,7 +219,7 @@ def get_user_inputs():
     print("5. Eigenvalues chosen from a Normal Distribution, specified min lambda and max lambda")
     choice = int(input("Enter problem type: "))
 
-    return nmin, nmax, xmin, xmax, lmin, lmax, choice
+    return nmin, nmax, step, xmin, xmax, lmin, lmax, choice
 
 """
 -------------------- Functions for Generating Results --------------------
@@ -287,12 +288,12 @@ def plot_errs_and_resids(ndim, err_array, resid_array, method, choice):
 -------------------- Main Routine --------------------
 """
 
-nmin, nmax, xmin, xmax, lmin, lmax, choice = get_user_inputs()
+nmin, nmax, step, xmin, xmax, lmin, lmax, choice = get_user_inputs()
 ndim = []
 RF_iter_avg = []
 SD_iter_avg = []
 CG_iter_avg = []
-for n in range(nmin, nmax + 1, 10):
+for n in range(nmin, nmax + 1, step):
     ndim.append(n)
     A = matrix_type_diag(choice, n, lmin, lmax)
     x_tilde = np.random.uniform(xmin, xmax, n)

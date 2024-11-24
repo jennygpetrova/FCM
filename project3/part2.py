@@ -157,20 +157,18 @@ def matrix_type_dense(choice):
     return A
 
 
-def plot_relative_errors(rel_err, method, choice):
-    plt.figure(figsize=(8, 6))  # Create a new figure
-    plt.plot(range(len(rel_err)), rel_err, label=method)
+def plot_relative_errors(rel_errs, methods, choice):
+    plt.figure(figsize=(8, 6))
+    for rel_err, method in zip(rel_errs, methods):
+        plt.plot(range(len(rel_err)), rel_err, label=method)
 
-    # Add labels, title, and legend
-    plt.xlabel("Iterations", fontsize=12)
-    plt.ylabel("Relative Error", fontsize=12)
     plt.yscale('log')
-    plt.title(f"{method} Convergence of Relative Errors for Matrix {choice}", fontsize=14)
-    plt.legend()
+    plt.xlabel('Iterations', fontsize=12)
+    plt.ylabel('Relative Error (log scale)', fontsize=12)
+    plt.title(f"Convergence of Relative Errors for Matrix {choice}", fontsize=14)
+    plt.legend(fontsize=10)
     plt.grid(True)
-
-    # Save and display the plot
-    plt.savefig(f'error_ratios_matrix_{i}.png', dpi=300, bbox_inches='tight')
+    plt.savefig(f'error_ratios_matrix_{choice}.png', dpi=300, bbox_inches='tight')
     plt.show()
 
 
@@ -181,6 +179,8 @@ def plot_relative_errors(rel_err, method, choice):
 for i in range(9):
     matrix_num = i
     results = []  # To store results for all methods for this matrix
+    rel_errs_all_methods = []  # To store relative errors for all methods
+    methods = []  # To store method names
 
     A = matrix_type_dense(i)
     n = A.shape[0]
@@ -221,8 +221,12 @@ for i in range(9):
         # Append results for this method to the list
         results.append((method, iter_avg, spectral_radius_avg, G_norm_avg, time_avg))
 
+        # Collect relative errors and method name for plotting
+        rel_errs_all_methods.append(rel_err_arr)
+        methods.append(method)
+
         # Plot relative errors for this method
-        plot_relative_errors(rel_err_arr, method, i)
+    plot_relative_errors(rel_errs_all_methods, methods, i)
 
     # Create a DataFrame for this matrix
     df = pd.DataFrame(results, columns=['Method', 'Iterations', 'Spectral Radius', 'G Norm', 'Time to Converge'])
