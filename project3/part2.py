@@ -1,3 +1,5 @@
+from numpy import ndarray
+
 from mypackage import myfunctions
 import numpy as np
 import matplotlib.pyplot as plt
@@ -87,6 +89,18 @@ def stationary_method(matrix_representation, x_tilde, x0, b, flag):
             U = np.triu(A, k=1)
             return L, U
 
+    def forward_sweep(A, b, x, n):
+        for i in range(n - 1, -1, -1):
+            sigma = np.dot(A[i, :i], x[:i]) + np.dot(A[i, i + 1:], x[i + 1:])
+            x[i] = (b[i] - sigma) / A[i, i]
+        return x
+
+    def backward_sweep(A, b, x, n):
+        for i in range(n):
+            sigma = np.dot(A[i, :i], x[:i]) + np.dot(A[i, i + 1:], x[i + 1:])
+            x[i] = (b[i] - sigma) / A[i, i]
+        return x
+
     # Initialize variables
     x = x0.copy()
     r = b - matrix_vector_multiply(x)
@@ -108,7 +122,9 @@ def stationary_method(matrix_representation, x_tilde, x0, b, flag):
 
     # Jacobi Method
     if flag == 1:
-        G = np.eye(n) - np.diag(1 / D).dot(A) if isinstance(matrix_representation, np.ndarray) else None
+        if isinstance(matrix_representation, np.ndarray):
+            G = np.eye(n) - np.diag(1 / D).dot(A)
+
         while iter < max_iter and rel_err > tol:
             rel_err = np.linalg.norm(x - x_tilde) / np.linalg.norm(x_tilde)
             rel_err_arr.append(rel_err)
@@ -123,11 +139,9 @@ def stationary_method(matrix_representation, x_tilde, x0, b, flag):
 
     # Gauss-Seidel (Forward) Method
     if flag == 2:
-        if isinstance(matrix_representation, tuple):
-            # Construct G for sparse
-            G = np.zeros((n, n))  # Not explicitly computed for sparse
-        else:
+        if isinstance(matrix_representation, np.ndarray):
             G = np.linalg.inv(L + np.diag(D)).dot(U)
+
         while iter < max_iter and rel_err > tol:
             rel_err = np.linalg.norm(x - x_tilde) / np.linalg.norm(x_tilde)
             rel_err_arr.append(rel_err)
@@ -145,23 +159,17 @@ def stationary_method(matrix_representation, x_tilde, x0, b, flag):
                             sigma += AA[k] * x[j]
                     x[i] = (b[i] - sigma) / D[i]
             else:  # Dense case
-                for i in range(n):
-                    sigma = np.dot(A[i, :i], x[:i]) + np.dot(A[i, i + 1:], x[i + 1:])
-                    x[i] = (b[i] - sigma) / A[i, i]
-
-            r = b - matrix_vector_multiply(x)
+                x = forward_sweep(A, b, x, n)
 
             # Increment iteration counter
             iter += 1
 
     # Gauss-Seidel (Symmetric) Method
     if flag == 3:
-        if isinstance(matrix_representation, tuple):
-            # Construct G for sparse
-            G = np.zeros((n, n))  # Not explicitly computed for sparse
-        else:
+        if isinstance(matrix_representation, ndarray):
             G_forward = np.linalg.inv(L + np.diag(D)).dot(U)
             G = G_forward.dot(np.linalg.inv(L + np.diag(D)))
+
         while iter < max_iter and rel_err > tol:
             rel_err = np.linalg.norm(x - x_tilde) / np.linalg.norm(x_tilde)
             rel_err_arr.append(rel_err)
@@ -180,9 +188,7 @@ def stationary_method(matrix_representation, x_tilde, x0, b, flag):
                             sigma += AA[k] * x[j]
                     x[i] = (b[i] - sigma) / D[i]
             else:  # Dense case
-                for i in range(n):
-                    sigma = np.dot(A[i, :i], x[:i]) + np.dot(A[i, i + 1:], x[i + 1:])
-                    x[i] = (b[i] - sigma) / A[i, i]
+                x = forward_sweep(A, b, x, n)
 
             # Backward sweep
             if isinstance(matrix_representation, tuple):  # Sparse case
@@ -197,15 +203,13 @@ def stationary_method(matrix_representation, x_tilde, x0, b, flag):
                         elif j > i:
                             sigma += AA[k] * x[j]
                     x[i] = (b[i] - sigma) / D[i]
-            else:  # Dense case
-                for i in range(n - 1, -1, -1):
-                    sigma = np.dot(A[i, :i], x[:i]) + np.dot(A[i, i + 1:], x[i + 1:])
-                    x[i] = (b[i] - sigma) / A[i, i]
 
-            r = b - matrix_vector_multiply(x)
+            else:  # Dense case
+                x = backward_sweep(A, b, x, n)
 
             # Increment iteration counter
             iter += 1
+
     if isinstance(matrix_representation, tuple):
         spectral_radius = None
         G_norm = None
@@ -213,6 +217,7 @@ def stationary_method(matrix_representation, x_tilde, x0, b, flag):
         eigenvalues = np.linalg.eigvals(G)
         spectral_radius = np.max(np.abs(eigenvalues))
         G_norm = np.linalg.norm(G)
+
     return x, G, spectral_radius, G_norm, iter, rel_err_arr
 
 
