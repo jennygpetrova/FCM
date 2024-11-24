@@ -74,15 +74,6 @@ def get_lower_upper_sparse(AA, JA, IA):
                 U[i] += AA[k]
     return L, U
 
-"""def plot_convergence(rel_err_arr):
-    plt.plot(rel_err_arr)
-    plt.yscale('log')
-    plt.xlabel('Iteration')
-    plt.ylabel('Relative Error (log scale)')
-    plt.title('Convergence of Stationary Method')
-    plt.grid(True)
-    plt.show()"""
-
 def stationary_method(matrix_representation, x_tilde, x0, b, flag):
     if isinstance(matrix_representation, tuple):  # CSR format
         AA, JA, IA = matrix_representation
@@ -153,6 +144,10 @@ def stationary_method(matrix_representation, x_tilde, x0, b, flag):
 
     return x, iter, rel_err_arr
 
+
+"""
+-------------------- Function for Generating Results --------------------
+"""
 def plot_relative_errors(rel_errs, methods, n, type):
     plt.figure(figsize=(8, 6))
     for rel_err, method in zip(rel_errs, methods):
@@ -181,11 +176,11 @@ def get_user_inputs():
     xmin = float(input("Minimum value: "))
     xmax = float(input("Maximum value: "))
 
-
     return nmin, nmax, step, xmin, xmax
 
+
 """
--------------------- Test for Dense and Sparse Matrices --------------------
+-------------------- Main Routine --------------------
 """
 nmin, nmax, step, xmin, xmax = get_user_inputs()
 

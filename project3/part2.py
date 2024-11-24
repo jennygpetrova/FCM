@@ -157,6 +157,9 @@ def matrix_type_dense(choice):
     return A
 
 
+"""
+-------------------- Function for Generating Results --------------------
+"""
 def plot_relative_errors(rel_errs, methods, choice):
     plt.figure(figsize=(8, 6))
     for rel_err, method in zip(rel_errs, methods):

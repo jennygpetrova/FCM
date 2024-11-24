@@ -221,6 +221,7 @@ def get_user_inputs():
 
     return nmin, nmax, step, xmin, xmax, lmin, lmax, choice
 
+
 """
 -------------------- Functions for Generating Results --------------------
 """
@@ -247,13 +248,15 @@ def plot_error_ratios(ndim, error_ratios, kappa, method, choice):
             bounds.append(bound)
         # Create the plot
         plt.plot(range(len(error_ratios)), error_ratios, label="Error Ratio", color='b')
-        plt.plot(range(len(error_ratios)), bounds, linestyle='--', color='b')
+        plt.plot(range(len(error_ratios)), bounds, linestyle='--', color='r')
 
     else:
         bound = (kappa - 1) / (kappa + 1)
+        if choice == 1:
+            bound = 1
         # Create the plot
         plt.plot(range(len(error_ratios)), error_ratios, label="Error Ratio", color='b')
-        plt.axhline(y=bound, linestyle='--', color='b')
+        plt.axhline(y=bound, linestyle='--', color='r')
 
     # Add labels, title, and legend
     plt.xlabel("Iterations")
@@ -269,8 +272,8 @@ def plot_error_ratios(ndim, error_ratios, kappa, method, choice):
 
 def plot_errs_and_resids(ndim, err_array, resid_array, method, choice):
     plt.figure(figsize=(8, 6))
-    plt.plot(range(len(err_array)), err_array, label='Error Ratios', color='b')
-    plt.plot(range(len(resid_array)), resid_array, label='Residuals', color='g')
+    plt.plot(range(len(err_array)), err_array, label='Error Terms', color='y')
+    plt.plot(range(len(resid_array)), resid_array, label='Residual Terms', color='g')
 
     # Add labels, title, and legend
     plt.xlabel("Iterations")
@@ -287,13 +290,13 @@ def plot_errs_and_resids(ndim, err_array, resid_array, method, choice):
 """
 -------------------- Main Routine --------------------
 """
-
 nmin, nmax, step, xmin, xmax, lmin, lmax, choice = get_user_inputs()
 ndim = []
 RF_iter_avg = []
 SD_iter_avg = []
 CG_iter_avg = []
-for n in range(nmin, nmax + 1, step):
+
+'''for n in range(nmin, nmax + 1, step):
     ndim.append(n)
     A = matrix_type_diag(choice, n, lmin, lmax)
     x_tilde = np.random.uniform(xmin, xmax, n)
@@ -314,7 +317,15 @@ for n in range(nmin, nmax + 1, step):
 
     RF_iter = []
     SD_iter = []
+    CG_iter = []'''
+
+for n in range(nmin, nmax + 1, step):
+    RF_iter = []
+    SD_iter = []
     CG_iter = []
+
+    ndim.append(n)
+    A = matrix_type_diag(choice, n, lmin, lmax)
 
     for i in range(5):
         x_tilde = np.random.uniform(xmin, xmax, n)
