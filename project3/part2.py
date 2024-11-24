@@ -11,16 +11,16 @@ np.random.seed(1234)
 """
 # Sparse symmetric positive definite (diagonally dominant) matrix
 def sparse_matrix(n):
-    A = np.zeros((n, n))
+    L = np.zeros((n, n))
     for i in range(n):
         for j in range(n):
             if i > j:
                 x = np.random.choice([0, 1])
                 if x == 1:
                     # Scale each row to ensure diagonal dominance
-                    A[i][j] = np.round(np.random.randint(1, 10) / i, 3)
-    A = A + A.T
-    np.fill_diagonal(A, 10)
+                    L[i][j] = np.round(np.random.randint(1, 10) / i, 3)
+    A = L + L.T
+    np.fill_diagonal(A, 20)
     return A
 
 # Compressed Sparse Row Storage (CSR)

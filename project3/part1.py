@@ -212,8 +212,8 @@ def get_user_inputs():
 
     print("\nProblem types:")
     print("1. All Eigenvalues the same")
-    print("2. k distinct eigenvalues with multiplicities")
-    print("3. k distinct eigenvalues with random distributions around each")
+    print("2. k distinct eigenvalues with randomly chosen multiplicities")
+    print("3. k distinct eigenvalues with normal distributions around each")
     print("4. Eigenvalues chosen from a Uniform Distribution, specified min lambda and max lambda")
     print("5. Eigenvalues chosen from a Normal Distribution, specified min lambda and max lambda")
     choice = int(input("Enter problem type: "))
@@ -228,7 +228,7 @@ def plot_convergence(ndim, RF_iter_avg, SD_iter_avg, CG_iter_avg, choice):
     plt.plot(ndim, SD_iter_avg, color='b', label='SD')
     plt.plot(ndim, CG_iter_avg, color='y', label='CG')
     plt.xlabel('Dimension n')
-    plt.ylabel('Number of Iterations Until Convergence')
+    plt.ylabel('Average Number of Iterations Until Convergence')
     plt.title(f'Iterations Until Convergence for Matrix Type {choice}')
     plt.legend()
     plt.savefig(f'type{choice}_iterations.png', dpi=300, bbox_inches='tight')
@@ -251,7 +251,7 @@ def plot_error_ratios(ndim, error_ratios, kappa, method, choice):
     plt.figure(figsize=(8, 6))
 
     # Calculate the convergence bound
-    if method == 3:
+    if method == 'CG':
         bounds = []
         for i in range(len(error_ratios)):
             bound = (2 * (np.sqrt(kappa) - 1) / (np.sqrt(kappa) + 1)) ** i
@@ -261,15 +261,32 @@ def plot_error_ratios(ndim, error_ratios, kappa, method, choice):
         plt.plot(range(len(error_ratios)), bounds, linestyle='--', color='b')
 
     else:
-        bound = [(kappa - 1) / (kappa + 1)]
+        bound = (kappa - 1) / (kappa + 1)
         # Create the plot
         plt.plot(range(len(error_ratios)), error_ratios, label="Error Ratio", color='b')
-        plt.axhline(y=kappa, linestyle='--', color='b')
+        plt.axhline(y=bound, linestyle='--', color='b')
 
     # Add labels, title, and legend
     plt.xlabel("Iterations")
     plt.ylabel("Error Ratio")
-    plt.title(f"Error Ratio for {method} (Dimension = {ndim})")
+    plt.title(f"Error Ratio for {method} (n = {ndim})")
+    plt.legend()
+    plt.grid(True)
+
+    # Save and show the plot
+    plt.savefig(f'error_ratios_{method}_{choice}_{ndim}.png', dpi=300, bbox_inches='tight')
+    plt.show()
+
+
+def plot_errs_and_resids(ndim, err_array, resid_array, method, choice):
+    plt.figure(figsize=(8, 6))
+    plt.plot(range(len(err_array)), err_array, label='Error Ratios', color='b')
+    plt.plot(range(len(resid_array)), resid_array, label='Residuals', color='g')
+
+    # Add labels, title, and legend
+    plt.xlabel("Iterations")
+    plt.ylabel("Errors and Residuals")
+    plt.title(f"Convergence of Error and Residual Terms for {method} (n = {ndim})")
     plt.legend()
     plt.grid(True)
 
@@ -283,56 +300,49 @@ def plot_error_ratios(ndim, error_ratios, kappa, method, choice):
 """
 def main():
     nmin, nmax, xmin, xmax, lmin, lmax, choice = get_user_inputs()
-
+    ndim = []
+    RF_iter_avg = []
+    SD_iter_avg = []
+    CG_iter_avg = []
     for n in range(nmin, nmax + 1, 10):
+        ndim.append(n)
         A = part_1_driver(choice, n, lmin, lmax)
         x_tilde = np.random.uniform(xmin, xmax, n)
         x0 = np.random.uniform(xmin, xmax, n)
         b = A * x_tilde
         kappa = np.max(A) / np.min(A)
 
-        x1, iter1, resid_arr1, err_arr1, err_ratio1 = richardsons_stationary(A, x_tilde, x0, b)
-        plot_error_ratios(n, err_ratio1, kappa, 1, choice)
-        x2, iter2, resid_arr2, err_arr2, err_ratio2 = steepest_descent(A, x_tilde, x0, b)
-        plot_error_ratios(n, err_ratio2, kappa, 2, choice)
-        x3, iter3, resid_arr3, err_arr3, err_ratio3 = conjugate_gradient(A, x_tilde, x0, b)
-        plot_error_ratios(n, err_ratio3, kappa, 3, choice)
 
-        RF_iter_avg = []
-        SD_iter_avg = []
-        CG_iter_avg = []
-        RF_times = []
-        SD_times = []
-        CG_times = []
+        x1, iter1, resid_arr1, err_arr1, err_ratio1 = richardsons_stationary(A, x_tilde, x0, b)
+        plot_error_ratios(n, err_ratio1, kappa, 'RF', choice)
+        plot_errs_and_resids(n, err_arr1, resid_arr1, 'RF', choice)
+        x2, iter2, resid_arr2, err_arr2, err_ratio2 = steepest_descent(A, x_tilde, x0, b)
+        plot_error_ratios(n, err_ratio2, kappa, 'SD', choice)
+        plot_errs_and_resids(n, err_arr2, resid_arr2, 'SD', choice)
+        x3, iter3, resid_arr3, err_arr3, err_ratio3 = conjugate_gradient(A, x_tilde, x0, b)
+        plot_error_ratios(n, err_ratio3, kappa, 'CG', choice)
+        plot_errs_and_resids(n, err_arr3, resid_arr3, 'CG', choice)
+
+        RF_iter = []
+        SD_iter = []
+        CG_iter = []
+
         for i in range(5):
-            RF_iter = []
-            SD_iter = []
-            CG_iter = []
             x_tilde = np.random.uniform(xmin, xmax, n)
             x0 = np.random.uniform(xmin, xmax, n)
             b = A * x_tilde
-            RF = richardsons_stationary(A, x_tilde, x0, b)
-            SD = steepest_descent(A, x_tilde, x0, b)
-            CG = conjugate_gradient(A, x_tilde, x0, b)
-            RF_iter.append(RF[2])
-            SD_iter.append(SD[2])
-            CG_iter.append(CG[2])
+            x1, iter1, resid_arr1, err_arr1, err_ratio1 = richardsons_stationary(A, x_tilde, x0, b)
+            x2, iter2, resid_arr2, err_arr2, err_ratio2 = steepest_descent(A, x_tilde, x0, b)
+            x3, iter3, resid_arr3, err_arr3, err_ratio3 = conjugate_gradient(A, x_tilde, x0, b)
+            RF_iter.append(iter1)
+            SD_iter.append(iter2)
+            CG_iter.append(iter3)
+
         RF_iter_avg.append(np.average(RF_iter))
         SD_iter_avg.append(np.average(SD_iter))
         CG_iter_avg.append(np.average(CG_iter))
 
-
-
-
-
-
-
-
-
-
-
-if __name__ == "__main__":
-    main()
+    plot_convergence(ndim, RF_iter_avg, SD_iter_avg, CG_iter_avg, choice)
 
 
 

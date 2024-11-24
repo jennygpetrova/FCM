@@ -7,16 +7,16 @@ from scipy.sparse.linalg import eigsh
 """
 # Sparse symmetric positive definite (diagonally dominant) matrix
 def sparse_matrix(n):
-    A = np.zeros((n, n))
+    L = np.zeros((n, n))
     for i in range(n):
         for j in range(n):
             if i > j:
-                x = np.random.choice([0, 1])
+                x = np.random.choice([0, 0, 1])
                 if x == 1:
                     # Scale each row to ensure diagonal dominance
-                    A[i][j] = np.round(np.random.randint(1, 10) / i, 3)
-    A = A + A.T
-    np.fill_diagonal(A, 10)
+                    L[i][j] = np.round(np.random.randint(1, 10) / i, 3)
+    A = L + L.T
+    np.fill_diagonal(A, 20)
     return A
 
 # Compressed Sparse Row Storage (CSR)
@@ -25,10 +25,10 @@ def compressed_row(A):
     JA = []  # Column indices
     IA = [0]  # Row pointers
     for row in A:
-        for col, val in enumerate(row):
-            if val != 0:
-                AA.append(val)
-                JA.append(col)
+        for j, a in enumerate(row):
+            if a != 0:
+                AA.append(a)
+                JA.append(j)
         IA.append(len(AA))  # End of current row in AA
     return np.array(AA), np.array(JA), np.array(IA)
 
@@ -225,6 +225,7 @@ b = np.dot(A, x_tilde)  # Dense matrix case
 
 # Dense matrix case
 print("Dense Matrix:")
+print(A)
 x, G, spectral_radius, G_norm, iter, rel_err_arr = stationary_method(A, x_tilde, x0, b, 1)
 print("Solution:", x)
 print("Iterations:", iter)
