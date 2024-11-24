@@ -1,6 +1,6 @@
 import numpy as np
-from scipy.sparse import csr_matrix
-from scipy.sparse.linalg import eigsh
+import matplotlib.pyplot as plt
+from mypackage import myfunctions
 
 """
 -------------------- Routine for Generating a Sparse Matrix and Storing in CSR Format --------------------
@@ -43,179 +43,98 @@ def csr_multiply(AA, JA, IA, x):
 """
 -------------------- Generalized Routines for Iterative Methods --------------------
 """
+def get_diagonal_dense(A):
+    return np.diag(A)
+
+def get_diagonal_sparse(AA, JA, IA):
+    diag = np.zeros(len(IA) - 1)
+    for i in range(len(diag)):
+        for k in range(IA[i], IA[i + 1]):
+            if JA[k] == i:
+                diag[i] = AA[k]
+                break
+    return diag
+
+def get_lower_upper_dense(A):
+    L = np.tril(A, k=-1)
+    U = np.triu(A, k=1)
+    return L, U
+
+def get_lower_upper_sparse(AA, JA, IA):
+    L = np.zeros(len(IA) - 1)
+    U = np.zeros(len(IA) - 1)
+    for i in range(len(IA) - 1):
+        for k in range(IA[i], IA[i + 1]):
+            j = JA[k]
+            if j < i:
+                L[i] += AA[k]
+            elif j > i:
+                U[i] += AA[k]
+    return L, U
+
+def plot_convergence(rel_err_arr):
+    plt.plot(rel_err_arr)
+    plt.yscale('log')
+    plt.xlabel('Iteration')
+    plt.ylabel('Relative Error (log scale)')
+    plt.title('Convergence of Stationary Method')
+    plt.grid(True)
+    plt.show()
+
 def stationary_method(matrix_representation, x_tilde, x0, b, flag):
-    # Determine whether the matrix is dense or in CSR format
     if isinstance(matrix_representation, tuple):  # CSR format
         AA, JA, IA = matrix_representation
-        def matrix_vector_multiply(x):
-            return csr_multiply(AA, JA, IA, x)
-
-        def extract_diagonal():
-            diag = np.zeros(len(IA) - 1)
-            for i in range(len(diag)):
-                for k in range(IA[i], IA[i + 1]):
-                    if JA[k] == i:
-                        diag[i] = AA[k]
-                        break
-            return diag
-
-        def extract_lower_upper():
-            # Extract lower and upper triangular parts of the matrix
-            L = np.zeros(len(IA) - 1)
-            U = np.zeros(len(IA) - 1)
-            for i in range(len(IA) - 1):
-                for k in range(IA[i], IA[i + 1]):
-                    j = JA[k]
-                    if j < i:
-                        L[i] += AA[k]
-                    elif j > i:
-                        U[i] += AA[k]
-            return L, U
-
+        matrix_vector_multiply = lambda x: csr_multiply(AA, JA, IA, x)
+        get_diagonal = lambda: get_diagonal_sparse(AA, JA, IA)
     else:  # Dense matrix
         A = matrix_representation
-        def matrix_vector_multiply(x):
-            return np.dot(A, x)
-
-        def extract_diagonal():
-            return np.diag(A)
-
-        def extract_lower_upper():
-            L = np.tril(A, k=-1)
-            U = np.triu(A, k=1)
-            return L, U
+        matrix_vector_multiply = lambda x: np.dot(A, x)
+        get_diagonal = lambda: get_diagonal_dense(A)
 
     # Initialize variables
-    x = x0.copy()
+    x = x0.astype(float)
     r = b - matrix_vector_multiply(x)
-    D = extract_diagonal()
-    L, U = extract_lower_upper()
+    D = get_diagonal()
     if np.any(D == 0):
         raise ValueError("Matrix A contains zero diagonal elements, iteration cannot proceed.")
     rel_err_arr = []
     rel_err = 1
-    n = len(x)
-
-    # Termination criterion
     max_iter = 1000
     tol = 1e-6
     iter = 0
 
-    # Initialize iteration matrix G
-    G = None
+    # Iterative methods
+    while iter < max_iter and rel_err > tol:
+        rel_err = np.linalg.norm(x - x_tilde) / np.linalg.norm(x_tilde)
+        rel_err_arr.append(rel_err)
 
-    # Jacobi Method
-    if flag == 1:
-        G = np.eye(n) - np.diag(1 / D).dot(A) if isinstance(matrix_representation, np.ndarray) else None
-        while iter < max_iter and rel_err > tol:
-            rel_err = np.linalg.norm(x - x_tilde) / np.linalg.norm(x_tilde)
-            rel_err_arr.append(rel_err)
-
-            # Iteration update
-            x_new = x + r / D
-            r = b - matrix_vector_multiply(x_new)
-            x = x_new
-
-            # Increment iteration counter
-            iter += 1
-
-    # Gauss-Seidel (Forward) Method
-    if flag == 2:
-        if isinstance(matrix_representation, tuple):
-            # Construct G for sparse
-            G = np.zeros((n, n))  # Not explicitly computed for sparse
-        else:
-            G = np.linalg.inv(L + np.diag(D)).dot(U)
-        while iter < max_iter and rel_err > tol:
-            rel_err = np.linalg.norm(x - x_tilde) / np.linalg.norm(x_tilde)
-            rel_err_arr.append(rel_err)
-
-            if isinstance(matrix_representation, tuple):  # Sparse case
-                for i in range(n):
-                    row_start = IA[i]
-                    row_end = IA[i + 1]
-                    sigma = 0
-                    for k in range(row_start, row_end):
-                        j = JA[k]
-                        if j < i:
-                            sigma += AA[k] * x[j]
-                        elif j > i:
-                            sigma += AA[k] * x[j]
-                    x[i] = (b[i] - sigma) / D[i]
-            else:  # Dense case
-                for i in range(n):
-                    sigma = np.dot(A[i, :i], x[:i]) + np.dot(A[i, i + 1:], x[i + 1:])
-                    x[i] = (b[i] - sigma) / A[i, i]
-
-            r = b - matrix_vector_multiply(x)
-
-            # Increment iteration counter
-            iter += 1
-
-    # Gauss-Seidel (Symmetric) Method
-    if flag == 3:
-        if isinstance(matrix_representation, tuple):
-            # Construct G for sparse
-            G = np.zeros((n, n))  # Not explicitly computed for sparse
-        else:
-            G_forward = np.linalg.inv(L + np.diag(D)).dot(U)
-            G = G_forward.dot(np.linalg.inv(L + np.diag(D)))
-        while iter < max_iter and rel_err > tol:
-            rel_err = np.linalg.norm(x - x_tilde) / np.linalg.norm(x_tilde)
-            rel_err_arr.append(rel_err)
-
+        if flag == 1:  # Jacobi
+            x += r / D
+        elif flag == 2 or flag == 3:  # Gauss-Seidel or Symmetric Gauss-Seidel
+            n = len(x)
             # Forward sweep
-            if isinstance(matrix_representation, tuple):  # Sparse case
-                for i in range(n):
-                    row_start = IA[i]
-                    row_end = IA[i + 1]
-                    sigma = 0
-                    for k in range(row_start, row_end):
-                        j = JA[k]
-                        if j < i:
-                            sigma += AA[k] * x[j]
-                        elif j > i:
-                            sigma += AA[k] * x[j]
+            for i in range(n):
+                row_start = IA[i] if isinstance(matrix_representation, tuple) else 0
+                row_end = IA[i + 1] if isinstance(matrix_representation, tuple) else n
+                sigma = sum(AA[k] * x[JA[k]] for k in range(row_start, row_end) if JA[k] != i)
+                x[i] = (b[i] - sigma) / D[i]
+
+            if flag == 3:  # Backward sweep for symmetric Gauss-Seidel
+                for i in range(len(x) - 1, -1, -1):
+                    row_start = IA[i] if isinstance(matrix_representation, tuple) else 0
+                    row_end = IA[i + 1] if isinstance(matrix_representation, tuple) else n
+                    sigma = sum(AA[k] * x[JA[k]] for k in range(row_start, row_end) if JA[k] != i)
                     x[i] = (b[i] - sigma) / D[i]
-            else:  # Dense case
-                for i in range(n):
-                    sigma = np.dot(A[i, :i], x[:i]) + np.dot(A[i, i + 1:], x[i + 1:])
-                    x[i] = (b[i] - sigma) / A[i, i]
 
-            # Backward sweep
-            if isinstance(matrix_representation, tuple):  # Sparse case
-                for i in range(n - 1, -1, -1):
-                    row_start = IA[i]
-                    row_end = IA[i + 1]
-                    sigma = 0
-                    for k in range(row_start, row_end):
-                        j = JA[k]
-                        if j < i:
-                            sigma += AA[k] * x[j]
-                        elif j > i:
-                            sigma += AA[k] * x[j]
-                    x[i] = (b[i] - sigma) / D[i]
-            else:  # Dense case
-                for i in range(n - 1, -1, -1):
-                    sigma = np.dot(A[i, :i], x[:i]) + np.dot(A[i, i + 1:], x[i + 1:])
-                    x[i] = (b[i] - sigma) / A[i, i]
+        # Update residual
+        r = b - matrix_vector_multiply(x)
+        iter += 1
 
-            r = b - matrix_vector_multiply(x)
-
-            # Increment iteration counter
-            iter += 1
-    if isinstance(matrix_representation, tuple):
-        spectral_radius = None
-        G_norm = None
-    else:
-        eigenvalues = np.linalg.eigvals(G)
-        spectral_radius = np.max(np.abs(eigenvalues))
-        G_norm = np.linalg.norm(G)
-    return x, G, spectral_radius, G_norm, iter, rel_err_arr
+    return x, iter, rel_err_arr
 
 
 """
--------------------- Test for Dense and Sparse Matrix --------------------
+-------------------- Test for Dense and Sparse Matrices --------------------
 """
 n = 5
 A = sparse_matrix(n)
@@ -226,19 +145,16 @@ b = np.dot(A, x_tilde)  # Dense matrix case
 # Dense matrix case
 print("Dense Matrix:")
 print(A)
-x, G, spectral_radius, G_norm, iter, rel_err_arr = stationary_method(A, x_tilde, x0, b, 1)
+x, iter, rel_err_arr = stationary_method(A, x_tilde, x0, b, 1)
 print("Solution:", x)
 print("Iterations:", iter)
-print("G:", G)
-print("Spectral Radius:", spectral_radius)
-print("G_norm:", G_norm)
-
+plot_convergence(rel_err_arr)
 
 # Sparse matrix case
 AA, JA, IA = compressed_row(A)
 print("\nSparse Matrix:")
-x, G, spectral_radius, G_norm, iter, rel_err_arr  = stationary_method((AA, JA, IA), x_tilde, x0, b, 1)
+x, iter, rel_err_arr = stationary_method((AA, JA, IA), x_tilde, x0, b, 1)
 print("Solution:", x)
 print("Iterations:", iter)
-print("G:", G)
+plot_convergence(rel_err_arr)
 

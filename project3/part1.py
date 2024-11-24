@@ -157,7 +157,7 @@ def conjugate_gradient(A, x_tilde, x0, b):
 """
 -------------------- Routine to Generate Test Matrices --------------------
 """
-def part_1_driver(choice, n, lmin, lmax):
+def matrix_type_diag(choice, n, lmin, lmax):
     # All eigenvalues the same
     if choice == 1:
         lrand = np.random.randint(lmin, lmax)
@@ -234,18 +234,6 @@ def plot_convergence(ndim, RF_iter_avg, SD_iter_avg, CG_iter_avg, choice):
     plt.savefig(f'type{choice}_iterations.png', dpi=300, bbox_inches='tight')
     plt.show()
 
-def plot_runtimes(ndim, time_RF_avg, time_SD_avg, time_CG_avg, choice):
-    # Plot runtimes for each method
-    plt.plot(ndim, time_RF_avg, label='RF Runtime', color='g')
-    plt.plot(ndim, time_SD_avg, label='SD Runtime', color='b')
-    plt.plot(ndim, time_CG_avg, label='CG Runtime', color='y')
-    plt.xlabel('Dimension n')
-    plt.ylabel('Runtime (seconds)')
-    plt.title(f'Runtime Comparison for RF, SD, and CG Methods (Type {choice})')
-    plt.legend()
-    plt.savefig(f'runtime_comparison_{choice}.png', dpi=300, bbox_inches='tight')
-    plt.show()
-
 
 def plot_error_ratios(ndim, error_ratios, kappa, method, choice):
     plt.figure(figsize=(8, 6))
@@ -298,51 +286,51 @@ def plot_errs_and_resids(ndim, err_array, resid_array, method, choice):
 """
 -------------------- Main Routine --------------------
 """
-def main():
-    nmin, nmax, xmin, xmax, lmin, lmax, choice = get_user_inputs()
-    ndim = []
-    RF_iter_avg = []
-    SD_iter_avg = []
-    CG_iter_avg = []
-    for n in range(nmin, nmax + 1, 10):
-        ndim.append(n)
-        A = part_1_driver(choice, n, lmin, lmax)
+
+nmin, nmax, xmin, xmax, lmin, lmax, choice = get_user_inputs()
+ndim = []
+RF_iter_avg = []
+SD_iter_avg = []
+CG_iter_avg = []
+for n in range(nmin, nmax + 1, 10):
+    ndim.append(n)
+    A = matrix_type_diag(choice, n, lmin, lmax)
+    x_tilde = np.random.uniform(xmin, xmax, n)
+    x0 = np.random.uniform(xmin, xmax, n)
+    b = A * x_tilde
+    kappa = np.max(A) / np.min(A)
+
+
+    x1, iter1, resid_arr1, err_arr1, err_ratio1 = richardsons_stationary(A, x_tilde, x0, b)
+    plot_error_ratios(n, err_ratio1, kappa, 'RF', choice)
+    plot_errs_and_resids(n, err_arr1, resid_arr1, 'RF', choice)
+    x2, iter2, resid_arr2, err_arr2, err_ratio2 = steepest_descent(A, x_tilde, x0, b)
+    plot_error_ratios(n, err_ratio2, kappa, 'SD', choice)
+    plot_errs_and_resids(n, err_arr2, resid_arr2, 'SD', choice)
+    x3, iter3, resid_arr3, err_arr3, err_ratio3 = conjugate_gradient(A, x_tilde, x0, b)
+    plot_error_ratios(n, err_ratio3, kappa, 'CG', choice)
+    plot_errs_and_resids(n, err_arr3, resid_arr3, 'CG', choice)
+
+    RF_iter = []
+    SD_iter = []
+    CG_iter = []
+
+    for i in range(5):
         x_tilde = np.random.uniform(xmin, xmax, n)
         x0 = np.random.uniform(xmin, xmax, n)
         b = A * x_tilde
-        kappa = np.max(A) / np.min(A)
-
-
         x1, iter1, resid_arr1, err_arr1, err_ratio1 = richardsons_stationary(A, x_tilde, x0, b)
-        plot_error_ratios(n, err_ratio1, kappa, 'RF', choice)
-        plot_errs_and_resids(n, err_arr1, resid_arr1, 'RF', choice)
         x2, iter2, resid_arr2, err_arr2, err_ratio2 = steepest_descent(A, x_tilde, x0, b)
-        plot_error_ratios(n, err_ratio2, kappa, 'SD', choice)
-        plot_errs_and_resids(n, err_arr2, resid_arr2, 'SD', choice)
         x3, iter3, resid_arr3, err_arr3, err_ratio3 = conjugate_gradient(A, x_tilde, x0, b)
-        plot_error_ratios(n, err_ratio3, kappa, 'CG', choice)
-        plot_errs_and_resids(n, err_arr3, resid_arr3, 'CG', choice)
+        RF_iter.append(iter1)
+        SD_iter.append(iter2)
+        CG_iter.append(iter3)
 
-        RF_iter = []
-        SD_iter = []
-        CG_iter = []
+    RF_iter_avg.append(np.average(RF_iter))
+    SD_iter_avg.append(np.average(SD_iter))
+    CG_iter_avg.append(np.average(CG_iter))
 
-        for i in range(5):
-            x_tilde = np.random.uniform(xmin, xmax, n)
-            x0 = np.random.uniform(xmin, xmax, n)
-            b = A * x_tilde
-            x1, iter1, resid_arr1, err_arr1, err_ratio1 = richardsons_stationary(A, x_tilde, x0, b)
-            x2, iter2, resid_arr2, err_arr2, err_ratio2 = steepest_descent(A, x_tilde, x0, b)
-            x3, iter3, resid_arr3, err_arr3, err_ratio3 = conjugate_gradient(A, x_tilde, x0, b)
-            RF_iter.append(iter1)
-            SD_iter.append(iter2)
-            CG_iter.append(iter3)
-
-        RF_iter_avg.append(np.average(RF_iter))
-        SD_iter_avg.append(np.average(SD_iter))
-        CG_iter_avg.append(np.average(CG_iter))
-
-    plot_convergence(ndim, RF_iter_avg, SD_iter_avg, CG_iter_avg, choice)
+plot_convergence(ndim, RF_iter_avg, SD_iter_avg, CG_iter_avg, choice)
 
 
 
