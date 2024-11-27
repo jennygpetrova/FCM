@@ -3,26 +3,27 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import time
-np.random.seed(1234)
+from scipy.linalg import cholesky
+np.random.seed(123)
 
 """
 -------------------- Routine for Stationary Iterative Methods --------------------
 """
-
 def stationary_method(A, x_tilde, x0, b, flag):
     # Initialize variables
     x = x0
     r = b - np.dot(A, x)
     D = np.diag(A)
-    L = np.tril(A, k=-1)
-    U = np.triu(A, k=1)
     if np.any(D == 0):
         raise ValueError("Matrix A contains zero diagonal elements, Jacobi iteration cannot proceed.")
-    rel_err_arr = []
-    rel_err = 1
+    L = np.tril(A, k=-1)
+    U = np.triu(A, k=1)
     n = len(x)
     G = None
     I = np.eye(n)
+
+    rel_err_arr = []
+    rel_err = 1
 
     # Termination criterion
     max_iter = 1000
@@ -46,7 +47,7 @@ def stationary_method(A, x_tilde, x0, b, flag):
             # Compute residual
             r = b - np.dot(A, x)
 
-            # Increment iteration counter
+            # Count Iteration
             iter += 1
 
     # Gauss-Seidel (Forward) Method
@@ -58,7 +59,7 @@ def stationary_method(A, x_tilde, x0, b, flag):
             rel_err = np.linalg.norm(x - x_tilde) / np.linalg.norm(x_tilde)
             rel_err_arr.append(rel_err)
 
-            # Iteration update
+            # Forward substitution
             x = myfunctions.forward_sweep(A, x, b, n)
 
             # Increment iteration counter
@@ -74,13 +75,16 @@ def stationary_method(A, x_tilde, x0, b, flag):
             rel_err = np.linalg.norm(x - x_tilde) / np.linalg.norm(x_tilde)
             rel_err_arr.append(rel_err)
 
-            # Iteration update
+            # Forward substitution
             x = myfunctions.forward_sweep(A, x, b, n)
+
+            # Backward substitution
             x = myfunctions.backward_sweep(A, x, b, n)
 
             # Increment iteration counter
             iter += 1
 
+    # Compute eigenvalues, spectral radius, and norm of G
     eigenvalues = np.linalg.eigvals(G)
     spectral_radius = np.max(np.abs(eigenvalues))
     G_norm = np.linalg.norm(G)
@@ -90,6 +94,7 @@ def stationary_method(A, x_tilde, x0, b, flag):
 """
 -------------------- Routine to Generate Test Matrices --------------------
 """
+# Choose A from the following predetermined matrices
 def matrix_type_dense(choice):
     if choice == 0:
         A = np.array([
@@ -156,6 +161,37 @@ def matrix_type_dense(choice):
         ])
     return A
 
+# Run analyses on each matrix A
+def analyze_matrix(A, tol=1e-8):
+    def is_symmetric(A):
+        return np.allclose(A, A.T, atol=tol)
+
+    def is_diagonally_dominant(A):
+        D = np.abs(np.diag(A))  # Diagonal elements
+        S = np.sum(np.abs(A), axis=1) - D  # Row sums minus diagonal
+        return np.all(D >= S)
+
+    def is_spd(A):
+        if not is_symmetric(A):
+            return False
+        try:
+            cholesky(A)
+            return True
+        except np.linalg.LinAlgError:
+            return False
+
+    def condition_number(A):
+        return np.round(np.linalg.cond(A), 2)
+
+    # Perform all checks
+    analysis = {
+        "Symmetric": is_symmetric(A),
+        "Diagonally Dominant": is_diagonally_dominant(A),
+        "SPD": is_spd(A),
+        "Condition Number": condition_number(A)
+    }
+    return analysis
+
 
 """
 -------------------- Function for Generating Results --------------------
@@ -178,17 +214,23 @@ def plot_relative_errors(rel_errs, methods, choice):
 """
 -------------------- Main Routine --------------------
 """
+# Initialize a list to store analysis results for all matrices
+analysis_results = []
+
 # Loop through matrices
 for i in range(9):
-    matrix_num = i
-    results = []  # To store results for all methods for this matrix
-    rel_errs_all_methods = []  # To store relative errors for all methods
-    methods = []  # To store method names
-
     A = matrix_type_dense(i)
-    n = A.shape[0]
 
-    # Loop through methods
+    # Perform analysis for the matrix
+    analysis = analyze_matrix(A)
+    analysis["Matrix"] = i  # Add matrix identifier
+    analysis_results.append(analysis)
+
+    # Perform convergence tests and generate plots
+    results = []
+    rel_errs_all_methods = []
+    methods = []
+
     for flag in range(1, 4):
         if flag == 1:
             method = 'Jacobi'
@@ -202,10 +244,9 @@ for i in range(9):
         G_norm_list = []
         time_list = []
 
-        # Run the method multiple times to average results
         for j in range(5):
-            x_tilde = np.random.uniform(-10, 10, n)
-            x0 = np.random.uniform(-10, 10, n)
+            x_tilde = np.random.uniform(-100, 100, A.shape[0])
+            x0 = np.random.uniform(-100, 100, A.shape[0])
             b = np.dot(A, x_tilde)
             start_time = time.time()
             x, G, spectral_radius, G_norm, iter, rel_err_arr = stationary_method(A, x_tilde, x0, b, flag)
@@ -215,27 +256,28 @@ for i in range(9):
             spectral_radii_list.append(spectral_radius)
             G_norm_list.append(G_norm)
 
-        # Compute averages for this method
         iter_avg = np.average(iter_list)
-        spectral_radius_avg = np.average(spectral_radii_list)
-        G_norm_avg = np.average(G_norm_list)
-        time_avg = np.average(time_list)
+        spectral_radius_avg = np.round(np.average(spectral_radii_list), 5)
+        G_norm_avg = np.round(np.average(G_norm_list), 5)
+        time_avg = np.round(np.average(time_list), 5)
 
-        # Append results for this method to the list
         results.append((method, iter_avg, spectral_radius_avg, G_norm_avg, time_avg))
-
-        # Collect relative errors and method name for plotting
         rel_errs_all_methods.append(rel_err_arr)
         methods.append(method)
 
-        # Plot relative errors for this method
+    # Plot relative errors for this matrix
     plot_relative_errors(rel_errs_all_methods, methods, i)
 
-    # Create a DataFrame for this matrix
+    # Table of convergence results for this matrix
     df = pd.DataFrame(results, columns=['Method', 'Iterations', 'Spectral Radius', 'G Norm', 'Time to Converge'])
-
-    # Print and save the results for this matrix
     print(f"Results for Matrix {i}:\n")
     print(df)
-    print("\n")
     df.to_csv(f'Results_Matrix_{i}.csv', index=False)
+
+# Create and display the analysis results table
+analysis_df = pd.DataFrame(analysis_results)
+analysis_df = analysis_df[["Matrix", "Symmetric", "Diagonally Dominant", "SPD", "Condition Number"]]
+
+analysis_df.to_csv('Matrix_Properties_Analysis.csv', index=False)
+print("Matrix Properties Analysis:")
+print(analysis_df)

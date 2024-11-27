@@ -1,6 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
-np.random.seed(1234)
+np.random.seed(123)
 
 """
 -------------------- Routines for Iterative Methods --------------------
@@ -43,10 +43,10 @@ def richardsons_stationary(A, x_tilde, x0, b):
         err_arr.append(np.linalg.norm(err_next))
         err_ratio.append(np.linalg.norm(err_next) / np.linalg.norm(err))
 
-        # Keep error term at current step after calculating error ratio
+        # Keep error term at current iteration after calculating error ratio
         err = err_next
 
-        # Count iterations
+        # Count iteration
         iter += 1
 
     return x, iter, resid_arr, err_arr, err_ratio
@@ -77,7 +77,7 @@ def steepest_descent(A, x_tilde, x0, b):
     while iter < max_iter and r_norm / r0_norm > tol:
         # Iteration updates
         v = A * r
-        alpha = np.dot(r, r) / np.dot(r, v)
+        alpha = np.dot(r, r) / np.dot(r, v) # Set alpha at each iteration
         x += alpha * r
         r -= alpha * v
 
@@ -91,10 +91,10 @@ def steepest_descent(A, x_tilde, x0, b):
         err_arr.append(err_A_norm_next)
         err_ratio.append(err_A_norm_next / err_A_norm)
 
-        # Keep error term at current step after calculating error ratio
+        # Keep error term at current iteration after calculating error ratio
         err_A_norm = err_A_norm_next
 
-        # Count Iterations
+        # Count Iteration
         iter += 1
 
     return x, iter, resid_arr, err_arr, err_ratio
@@ -145,10 +145,10 @@ def conjugate_gradient(A, x_tilde, x0, b):
         err_arr.append(err_A_norm)
         err_ratio.append(err_A_norm / err_A_norm_0)
 
-        # Keep sigma term at current step
+        # Keep sigma term at current iteration
         sigma = sigma_next
 
-        # Count iterations
+        # Count iteration
         iter += 1
 
     return x, iter, resid_arr, err_arr, err_ratio
@@ -198,6 +198,13 @@ def matrix_type_diag(choice, n, lmin, lmax):
 -------------------- Input Collection --------------------
 """
 def get_user_inputs():
+    print("\nWe test iterative methods on the following diagonal matrices:\n")
+    print("1. All Eigenvalues the same")
+    print("2. k distinct eigenvalues with randomly chosen multiplicities")
+    print("3. k distinct eigenvalues with normal distributions around each")
+    print("4. Eigenvalues chosen from a Uniform Distribution, specified min lambda and max lambda")
+    print("5. Eigenvalues chosen from a Normal Distribution, specified min lambda and max lambda")
+
     print("\nEnter range of dimensions to generate (nxn) matrix A: ")
     nmin = int(input("Minimum value: "))
     nmax = int(input("Maximum value: "))
@@ -211,20 +218,13 @@ def get_user_inputs():
     lmin = float(input("Enter lambda min: "))
     lmax = float(input("Enter lambda max: "))
 
-    print("\nProblem types:")
-    print("1. All Eigenvalues the same")
-    print("2. k distinct eigenvalues with randomly chosen multiplicities")
-    print("3. k distinct eigenvalues with normal distributions around each")
-    print("4. Eigenvalues chosen from a Uniform Distribution, specified min lambda and max lambda")
-    print("5. Eigenvalues chosen from a Normal Distribution, specified min lambda and max lambda")
-    choice = int(input("Enter problem type: "))
-
-    return nmin, nmax, step, xmin, xmax, lmin, lmax, choice
+    return nmin, nmax, step, xmin, xmax, lmin, lmax
 
 
 """
 -------------------- Functions for Generating Results --------------------
 """
+
 def plot_convergence(ndim, RF_iter_avg, SD_iter_avg, CG_iter_avg, choice):
     plt.plot(ndim, RF_iter_avg, color='g', label='RF')
     plt.plot(ndim, SD_iter_avg, color='b', label='SD')
@@ -246,26 +246,20 @@ def plot_error_ratios(ndim, error_ratios, kappa, method, choice):
         for i in range(len(error_ratios)):
             bound = (2 * (np.sqrt(kappa) - 1) / (np.sqrt(kappa) + 1)) ** i
             bounds.append(bound)
-        # Create the plot
         plt.plot(range(len(error_ratios)), error_ratios, label="Error Ratio", color='b')
         plt.plot(range(len(error_ratios)), bounds, linestyle='--', color='r')
 
     else:
         bound = (kappa - 1) / (kappa + 1)
-        if choice == 1:
-            bound = 1
-        # Create the plot
         plt.plot(range(len(error_ratios)), error_ratios, label="Error Ratio", color='b')
         plt.axhline(y=bound, linestyle='--', color='r')
 
-    # Add labels, title, and legend
     plt.xlabel("Iterations")
     plt.ylabel("Error Ratio")
     plt.title(f"Error Ratio for {method} (n = {ndim})")
     plt.legend()
     plt.grid(True)
 
-    # Save and show the plot
     plt.savefig(f'error_ratios_{method}_{choice}_{ndim}.png', dpi=300, bbox_inches='tight')
     plt.show()
 
@@ -275,40 +269,41 @@ def plot_errs_and_resids(ndim, err_array, resid_array, method, choice):
     plt.plot(range(len(err_array)), err_array, label='Error Terms', color='y')
     plt.plot(range(len(resid_array)), resid_array, label='Residual Terms', color='g')
 
-    # Add labels, title, and legend
     plt.xlabel("Iterations")
     plt.ylabel("Errors and Residuals")
     plt.title(f"Convergence of Error and Residual Terms for {method} (n = {ndim})")
     plt.legend()
     plt.grid(True)
 
-    # Save and show the plot
-    plt.savefig(f'errrors_and_residuals_{method}_{choice}_{ndim}.png', dpi=300, bbox_inches='tight')
+    plt.savefig(f'errors_and_residuals_{method}_{choice}_{ndim}.png', dpi=300, bbox_inches='tight')
     plt.show()
 
 
 """
 -------------------- Main Routine --------------------
 """
-# nmin, nmax, step, xmin, xmax, lmin, lmax, choice = get_user_inputs()
-ndim = [10, 50, 100]
-xmin = -100
-xmax = 100
-lmin = 1
-lmax = 100
-RF_iter_avg = []
-SD_iter_avg = []
-CG_iter_avg = []
+nmin, nmax, step, xmin, xmax, lmin, lmax = get_user_inputs()
 
+
+# Test error ratios and error/residual terms for each matrix type
 for choice in range(1,6):
-    for n in ndim:
+    RF_iter_avg = []
+    SD_iter_avg = []
+    CG_iter_avg = []
+
+    for n in range(nmin, nmax+1, step):
+
+        # Generate matrix
         A = matrix_type_diag(choice, n, lmin, lmax)
+
         x_tilde = np.random.uniform(xmin, xmax, n)
         x0 = np.random.uniform(xmin, xmax, n)
         b = A * x_tilde
+
+        # Calculate condition number
         kappa = np.max(A) / np.min(A)
 
-
+        # Test and plot results for each method
         x1, iter1, resid_arr1, err_arr1, err_ratio1 = richardsons_stationary(A, x_tilde, x0, b)
         plot_error_ratios(n, err_ratio1, kappa, 'RF', choice)
         plot_errs_and_resids(n, err_arr1, resid_arr1, 'RF', choice)
@@ -320,30 +315,33 @@ for choice in range(1,6):
         plot_errs_and_resids(n, err_arr3, resid_arr3, 'CG', choice)
 
 
-"""for n in range(nmin, nmax + 1, step):
-    RF_iter = []
-    SD_iter = []
-    CG_iter = []
+        ndim = []
 
-    ndim.append(n)
-    A = matrix_type_diag(choice, n, lmin, lmax)
+        # Test average number of iterations per method
+        RF_iter = []
+        SD_iter = []
+        CG_iter = []
 
-    for i in range(5):
-        x_tilde = np.random.uniform(xmin, xmax, n)
-        x0 = np.random.uniform(xmin, xmax, n)
-        b = A * x_tilde
-        x1, iter1, resid_arr1, err_arr1, err_ratio1 = richardsons_stationary(A, x_tilde, x0, b)
-        x2, iter2, resid_arr2, err_arr2, err_ratio2 = steepest_descent(A, x_tilde, x0, b)
-        x3, iter3, resid_arr3, err_arr3, err_ratio3 = conjugate_gradient(A, x_tilde, x0, b)
-        RF_iter.append(iter1)
-        SD_iter.append(iter2)
-        CG_iter.append(iter3)
+        ndim.append(n)
+        A = matrix_type_diag(choice, n, lmin, lmax)
 
-    RF_iter_avg.append(np.average(RF_iter))
-    SD_iter_avg.append(np.average(SD_iter))
-    CG_iter_avg.append(np.average(CG_iter))
+        for i in range(5):
+            x_tilde = np.random.uniform(xmin, xmax, n)
+            x0 = np.random.uniform(xmin, xmax, n)
+            b = A * x_tilde
+            x1, iter1, resid_arr1, err_arr1, err_ratio1 = richardsons_stationary(A, x_tilde, x0, b)
+            x2, iter2, resid_arr2, err_arr2, err_ratio2 = steepest_descent(A, x_tilde, x0, b)
+            x3, iter3, resid_arr3, err_arr3, err_ratio3 = conjugate_gradient(A, x_tilde, x0, b)
+            RF_iter.append(iter1)
+            SD_iter.append(iter2)
+            CG_iter.append(iter3)
 
-plot_convergence(ndim, RF_iter_avg, SD_iter_avg, CG_iter_avg, choice)"""
+        RF_iter_avg.append(np.average(RF_iter))
+        SD_iter_avg.append(np.average(SD_iter))
+        CG_iter_avg.append(np.average(CG_iter))
+
+    plot_convergence(ndim, RF_iter_avg, SD_iter_avg, CG_iter_avg, choice)
+
 
 
 

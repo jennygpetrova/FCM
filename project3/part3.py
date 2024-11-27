@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import time
 from mypackage import myfunctions
+np.random.seed(123)
 
 """
 -------------------- Routine for Generating a Sparse Matrix and Storing in CSR Format --------------------
@@ -45,6 +46,7 @@ def csr_multiply(AA, JA, IA, x):
 """
 -------------------- Generalized Routines for Iterative Methods --------------------
 """
+# Define helper routines for computations with compressed matrices
 def get_diagonal_dense(A):
     return np.diag(A)
 
@@ -91,6 +93,9 @@ def stationary_method(matrix_representation, x_tilde, x0, b, flag):
     D = get_diagonal()
     if np.any(D == 0):
         raise ValueError("Matrix A contains zero diagonal elements, iteration cannot proceed.")
+    G = None
+    I = np.eye(n)
+
     rel_err_arr = []
     rel_err = 1
     max_iter = 1000
@@ -102,11 +107,13 @@ def stationary_method(matrix_representation, x_tilde, x0, b, flag):
         rel_err = np.linalg.norm(x - x_tilde) / np.linalg.norm(x_tilde)
         rel_err_arr.append(rel_err)
 
-        if flag == 1:  # Jacobi
+        # Jacobi
+        if flag == 1:
             x += r / D
             r = b - matrix_vector_multiply(x)
 
-        elif flag == 2 or flag == 3:  # Gauss-Seidel or Symmetric Gauss-Seidel
+        # Gauss-Seidel or Symmetric Gauss-Seidel
+        elif flag == 2 or flag == 3:
             # Forward sweep
             if isinstance(matrix_representation, tuple):
                 for i in range(n):
@@ -123,7 +130,8 @@ def stationary_method(matrix_representation, x_tilde, x0, b, flag):
             else:
                 x = myfunctions.forward_sweep(A, x, b, n)
 
-        if flag == 3:  # Backward sweep for symmetric Gauss-Seidel
+        # Additional step for symmetric Gauss-Seidel
+        if flag == 3:  # Backward sweep
             if isinstance(matrix_representation, tuple):
                 for i in range(n - 1, -1, -1):
                     row_start = IA[i]
@@ -138,11 +146,29 @@ def stationary_method(matrix_representation, x_tilde, x0, b, flag):
                     x[i] = (b[i] - sigma) / D[i]
             else:
                 x = myfunctions.backward_sweep(A, x, b, n)
-
-
         iter += 1
 
-    return x, iter, rel_err_arr
+        # Compute eigenvalues, spectral radius, and norm of G
+        # only for 2D array storage
+        if isinstance(matrix_representation, tuple):
+            spectral_radius = None
+            G_norm = None
+        else:
+            L = np.tril(A, k=-1)
+            U = np.triu(A, k=1)
+            if flag == 1:
+                G = I - (A / D)
+            elif flag == 2:
+                G = np.linalg.inv(L + np.diag(D)).dot(U)
+            elif flag == 3:
+                G_forward = np.linalg.inv(L + np.diag(D)).dot(U)
+                G = G_forward.dot(np.linalg.inv(L + np.diag(D)))
+
+            eigenvalues = np.linalg.eigvals(G)
+            spectral_radius = np.max(np.abs(eigenvalues))
+            G_norm = np.linalg.norm(G)
+
+    return x, G, spectral_radius, G_norm, iter, rel_err_arr
 
 
 """
@@ -159,7 +185,7 @@ def plot_relative_errors(rel_errs, methods, n, type):
     plt.title(f"Convergence of Relative Errors for {type} Matrix (n = {n})", fontsize=14)
     plt.legend(fontsize=10)
     plt.grid(True)
-    plt.savefig(f'rel_errs_{n}.png', dpi=300, bbox_inches='tight')
+    plt.savefig(f'rel_errs_{n}_{type}.png', dpi=300, bbox_inches='tight')
     plt.show()
 
 
@@ -211,35 +237,41 @@ for n in range(nmin, nmax + 1, step):
         time_avg = []
         time_list_csr = []
         time_csr_avg = []
+        spectral_radius_list = []
+        spectral_radius_avg = []
 
         # Run the method multiple times to average results
         for j in range(5):
-            x_tilde = np.random.uniform(-10, 10, n)
-            x0 = np.random.uniform(-10, 10, n)
+            x_tilde = np.random.uniform(xmin, xmax, n)
+            x0 = np.random.uniform(xmin, xmax, n)
 
             # Sparse matrix multiplication
             b = np.dot(A, x_tilde)
+
             # Time for sparse matrix to converge
             start_time = time.time()
-            x, iter_num, rel_err_arr = stationary_method(A, x_tilde, x0, b, flag)
+            x, G, spectral_radius, G_norm, iter, rel_err_arr = stationary_method(A, x_tilde, x0, b, flag)
             end_time = time.time()
             time_list.append(end_time - start_time)
-            iter_list.append(iter_num)
+            iter_list.append(iter)
+
+            spectral_radius_list.append(spectral_radius)
 
             # Compressed matrix multiplication
             b_csr = csr_multiply(AA, JA, IA, x_tilde)
             start_time = time.time()
-            x_csr, iter_csr, rel_err_csr = stationary_method((AA, JA, IA), x_tilde, x0, b_csr, flag)
+            x, G, spectral_radius, G_norm, iter, rel_err_csr = stationary_method((AA, JA, IA), x_tilde, x0, b_csr, flag)
             end_time = time.time()
             time_list_csr.append(end_time - start_time)
 
         # Compute averages
         iter_avg = np.average(iter_list)
-        time_avg = np.average(time_list)
-        time_csr_avg = np.average(time_list_csr)
+        time_avg = np.round(np.average(time_list),5)
+        time_csr_avg = np.round(np.average(time_list_csr), 5)
+        spectral_radius_avg = np.round(np.average(spectral_radius_list), 5)
 
         # Append results for this method to the list
-        results.append((method, iter_avg, time_avg, time_csr_avg))
+        results.append((method, iter_avg, spectral_radius_avg, time_avg, time_csr_avg))
 
         # Collect relative errors and method name for plotting
         rel_errs.append(rel_err_arr)
@@ -251,7 +283,7 @@ for n in range(nmin, nmax + 1, step):
     plot_relative_errors(rel_errs_csr, methods, n, 'Compressed')
 
     # Create a DataFrame for this matrix
-    df = pd.DataFrame(results, columns=['Method', 'Iterations', 'Sparse Time', 'Compressed Time'])
+    df = pd.DataFrame(results, columns=['Method', 'Iterations', 'Spectral Radius', 'Sparse Time', 'Compressed Time'])
 
     # Print and save the results for this matrix
     print(f"Comparing Convergence Times for Sparse vs Compressed Row Storage(n = {n}):\n")
