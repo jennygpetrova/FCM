@@ -1,4 +1,0 @@
-Method,Iterations,Spectral Radius,Sparse Time,Compressed Time
-Jacobi,12.6,0.36263,0.02111,0.01276
-GS,7.4,0.12984,0.03356,0.00809
-SGS,7.2,0.01295,0.05175,0.01327
