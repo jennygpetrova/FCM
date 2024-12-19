@@ -1,4 +1,0 @@
-Method,Iterations,Spectral Radius,G Norm,Time to Converge
-Jacobi,1000.0,1.22964,3.25854,0.01133
-GS,12.4,0.25,2.28066,0.00034
-SGS,12.4,0.52083,1.2095,0.00054
