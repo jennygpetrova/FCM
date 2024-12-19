@@ -1,0 +1,6 @@
+This report presents a method to efficiently evaluate the lower-upper ($LU$) factorization of a nonsingular matrix $A \in R^{n \times n}$. This factorization is achieved by changing the basis of the full-rank matrix $A$ to an upper triangular form $U$. Nonsingular transformations $T^{-1}_i$ are applied such that
+$T^{-1}_i A \to U $
+where $U \in R^{n \times n}$ and nonsingular, and the product of the transformations $T_i$ form the unit lower triangular matrix $L \in R^{n \times n}$. Gaussian transformations and permutation arrays ($P_r$, $P_c$) are applied to achieve the transformation $P_r A P_c = LU$
+where the indices of $P_r \in R^{n \times n}$ indicate the row order of A, the indices of $P_c \in R^{n \times n}$ indicate the column order of A, $L \in R^{n \times n}$ is a unit lower triangular matrix, and $U \in R^{n \times n}$ is a nonsingular upper triangular matrix. \\
+The factorization routines avoid the usage of high-level matrix libraries; solutions are developed by performing in-place updates to the matrix $A$, minimizing memory usage. \\
+The accuracy and efficiency of the implemented LU factorizations are evaluated across various test matrices, included randomly generated matrices and specific structured matrices to highlight numerical stability issues. 
