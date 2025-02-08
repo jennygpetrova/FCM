@@ -1,9 +1,7 @@
 import numpy as np
 from numpy import dtype
 
-# Preset datatype to change between 32-bit and 64-bit floating point system
 dtype=np.float64
-#dtype = np.float32
 
 # Functions f(x) for testing routines
 def f(x, dtype=dtype):
@@ -26,13 +24,11 @@ def f2(x, d, dtype=dtype):
 def f3(x, x_values, n, dtype=dtype):
     x = np.asarray(x, dtype=dtype)
     x_values = np.asarray(x_values, dtype=dtype)
-    l = np.ones_like(x, dtype=dtype)
-    for i in range(n):
-        term = np.ones_like(x, dtype=dtype)
-        for j in range(n):
+    for i in range(0, n):
+        l = np.asarray(1, dtype=dtype)
+        for j in range(0, n):
             if i != j:
-                term *= (x - x_values[j]) / (x_values[i] - x_values[j])
-        l += term
+                l *= (x - x_values[j]) / (x_values[i] - x_values[j])
     return l
 
 def f4(x, dtype=dtype):
@@ -40,6 +36,8 @@ def f4(x, dtype=dtype):
     y = 1 / (1 + (25 * x ** 2))
     return y
 
+
+# Barycentric 1 Form
 def bary1_weights(x_values, f, dtype=dtype):
     x_values = np.asarray(x_values, dtype=dtype)
     n = len(x_values)
@@ -56,22 +54,19 @@ def bary1_weights(x_values, f, dtype=dtype):
 def bary1_interpolation(x, x_values, gamma, y_values, dtype=dtype):
     x = np.asarray(x, dtype=dtype)
     x_values = np.asarray(x_values, dtype=dtype)
-    numerator = np.zeros_like(x, dtype=dtype)
-    denominator = np.zeros_like(x, dtype=dtype)
-
+    sum = 0
     for i in range(len(x_values)):
-        if np.abs(x - x_values[i]) < np.finfo(dtype).eps:
-            return y_values[i]
-        term = gamma[i] / (x - x_values[i])
-        numerator += term * y_values[i]
-        denominator += term
-
-    return numerator / denominator
+        w = 1
+        for j in range(len(x_values)):
+            w *= (x - x_values[j])
+        sum += y_values[i] * gamma[i] / (x - x_values[i])
+    p = np.asarray(w * sum, dtype=dtype)
+    return p
 
 # Sample points
 x_values = np.asarray([0, 0.5, 1], dtype=dtype)
 
-def f5(x): return np.asarray(x, dtype=dtype)
+def f5(x): return np.asarray((6*x) + 2, dtype=dtype)
 
 # Compute weights and function values
 gamma, y_values = bary1_weights(x_values, f5)
