@@ -1,3 +1,9 @@
+'''FIX!'''
+# (1) Newton divided differences and interpolation function
+# (2) Leja ordering code
+# (3) Add condition numbers
+
+
 import numpy as np
 import math
 
@@ -6,21 +12,17 @@ dtype = np.float64
 
 # Functions f(x) for testing routines
 def f1(x, d, dtype=dtype):
-    x = np.asarray(x, dtype=dtype)
-    return (x - 2) ** d
-
+    y = (x - 2) ** d
+    y = np.asarray(y, dtype=dtype)
+    return y
 
 def f2(x, d, dtype=dtype):
-    x = np.asarray(x, dtype=dtype)
     y = np.ones_like(x, dtype=dtype)
     for i in range(d + 1):
         y *= (x - i)
     return y
 
-
 def f3(x, x_i, n, dtype=dtype):
-    x = np.asarray(x, dtype=dtype)
-    x_i = np.asarray(x_i, dtype=dtype)
     l = np.ones_like(x, dtype=dtype)
     for i in range(n):
         for j in range(n):
@@ -28,10 +30,10 @@ def f3(x, x_i, n, dtype=dtype):
                 l *= (x - x_i[j]) / (x_i[i] - x_i[j])
     return l
 
-
 def f4(x, dtype=dtype):
-    x = np.asarray(x, dtype=dtype)
-    return 1 / (1 + (25 * x ** 2))
+    y = 1 / (1 + (25 * x ** 2))
+    y = np.asarray(y, dtype=dtype)
+    return y
 
 
 # Barycentric 1 form weights
@@ -155,10 +157,26 @@ def newton_divided_diff(x_i, f, dtype=dtype):
             # This is the right side of the divided differences table
             y_diff[i] = (y_diff[i + 1] - y_diff[i]) / (x_i[i + k] - x_i[i])
 
-
     print("newton_divided_diff -> y_diff:", y_diff)
     print("newton_divided_diff -> y_i:", y_i)
     return y_diff, y_i
+
+def newton_interpolation(x, x_i, y_diff, dtype=dtype):
+    n = len(y_diff)
+    y_diff_ordered = y_diff[::-1]
+    p = np.ones_like(x, dtype=dtype)
+
+    for k in range(len(x)):
+        sum = y_diff_ordered[0]
+        for i in range(1, n):
+            term = y_diff_ordered[i]
+            for j in range(i):
+                term *= (x[k] - x_i[j])
+            sum += term
+        p[k] = sum
+
+    print("newton_interpolation -> p:", p)
+    return p
 
 
 # Horner's Rule
@@ -224,6 +242,7 @@ x_i3 = ordering(x_i2, flag=3)
 p2 = bary2_interpolation(x, x_i2, beta, y_i)
 
 y_diff, y_i = newton_divided_diff(x_i, f5)
+p3 = newton_interpolation(x, x_i, y_diff)
 s = horners_rule(x, x_i, y_diff)
 
 norm, avg, var = evaluate_p(p, f5, x)
