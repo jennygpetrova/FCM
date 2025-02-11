@@ -52,24 +52,30 @@ def bary1_weights(x_values, f, dtype=dtype):
 
 # Barycentric 1 form interpolating polynomial
 def bary1_interpolation(x, x_values, gamma, y_values, dtype=dtype):
-    x = np.asarray(x, dtype=dtype)
     n = len(x_values)
+    l = np.ones(n, dtype=dtype)
     w = np.prod(x - x_values)
-    sum = 0
+    p_sum = 0
+    k_num = 0
 
     for i in range(n):
-        sum += y_values[i] * gamma[i] / (x - x_values[i])
+        p_sum += y_values[i] * gamma[i] / (x - x_values[i])
+        for j in range(i):
+            if i != j:
+                l[i] *= (x_values[i] - x_values[j])
+        k_num += np.abs(l[i] * y_values[i])
 
-    p = np.asarray(w * sum, dtype=dtype)
+    p = np.asarray(w * p_sum, dtype=dtype)
+    cond_num = k_num / p
     print("bary1_interpolation -> p:", p)
-    return p
+    print("bary1_interpolation -> cond_num:", cond_num)
+    return p, cond_num
 
 
 # Barycentric 2 form weights
-def bary2_weights(flag, n, f, dtype=dtype):
+def bary2_weights(flag, n, f, a=-1, b=1, dtype=dtype):
     beta = np.ones(n + 1, dtype=dtype)
     x_values = np.zeros(n + 1, dtype=dtype)
-    a, b = -1, 1
 
     if flag == 1:
         x_values = np.linspace(a, b, n + 1, dtype=dtype)
@@ -130,11 +136,11 @@ def newton_divided_diff(x_values, f, dtype=dtype):
 # Horner's Rule
 def horners_rule(x, x_values, y_diff):
     n = len(x_values)
-    s = y_diff[n - 1]
-    for i in range(n - 2, -1, -1):
+    s = y_diff[0]
+    for i in range(n):
         s = s * (x - x_values[i]) + y_diff[i]
 
-    print("horners_rule -> p:", s)
+    print("horners_rule -> s:", s)
     return s
 
 
@@ -159,12 +165,11 @@ def ordering(x_values, flag):
     print("ordering -> x_values:", x_values)
     return x_values
 
-
 # Error Evaluation
-def evaluate_p(p, f, dtype=dtype):
-    r = np.asarray(p - f, dtype=dtype)
+def evaluate_p(p, f, x, dtype=dtype):
+    r = np.asarray(p - f(x), dtype=dtype)
     print("evaluate_p -> r:", r)
-    return np.linalg.norm(r, ord=np.inf), np.average(r), np.var(r)
+    #return np.linalg.norm(r, ord=np.inf), np.average(r), np.var(r)
 
 # Sample Tests
 x_values = np.asarray([0, 0.5, 1], dtype=dtype)
@@ -172,7 +177,7 @@ x_values = np.asarray([0, 0.5, 1], dtype=dtype)
 def f5(x): return np.asarray((6 * x) + 2, dtype=dtype)
 
 gamma, y_values = bary1_weights(x_values, f5)
-p = bary1_interpolation(2, x_values, gamma, y_values)
+p, cond_num = bary1_interpolation(2, x_values, gamma, y_values)
 
 beta, x_values2, y_values = bary2_weights(3, 6, f5)
 x_values3 = ordering(x_values2, flag=3)
@@ -181,3 +186,7 @@ p2 = bary2_interpolation(2, x_values2, beta, y_values)
 y_diff, y_values = newton_divided_diff(x_values, f5)
 s = horners_rule(2, x_values, y_diff)
 
+evaluate_p(p2, f5, 2)
+# print("norm:", norm)
+# print("avg:", avg)
+# print("diff:", diff)
