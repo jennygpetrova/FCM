@@ -18,14 +18,14 @@ def f2(x, d, dtype=dtype):
     return y
 
 
-def f3(x, x_values, n, dtype=dtype):
+def f3(x, x_i, n, dtype=dtype):
     x = np.asarray(x, dtype=dtype)
-    x_values = np.asarray(x_values, dtype=dtype)
+    x_i = np.asarray(x_i, dtype=dtype)
     l = np.ones_like(x, dtype=dtype)
     for i in range(n):
         for j in range(n):
             if i != j:
-                l *= (x - x_values[j]) / (x_values[i] - x_values[j])
+                l *= (x - x_i[j]) / (x_i[i] - x_i[j])
     return l
 
 
@@ -35,38 +35,54 @@ def f4(x, dtype=dtype):
 
 
 # Barycentric 1 form weights
-def bary1_weights(x_values, f, dtype=dtype):
-    n = len(x_values)
+def bary1_weights(x_i, f, dtype=dtype):
+    n = len(x_i)
     gamma = np.ones(n, dtype=dtype)
-    y_values = np.array([f(x) for x in x_values], dtype=dtype)
+    y_i = np.array([f(x) for x in x_i], dtype=dtype)
 
     for i in range(n):
         for j in range(n):
             if i != j:
-                gamma[i] /= (x_values[i] - x_values[j])
+                gamma[i] /= (x_i[i] - x_i[j])
 
     print("bary1_weights -> gamma:", gamma)
-    print("bary1_weights -> y_values:", y_values)
-    return gamma, y_values
+    print("bary1_weights -> y_values:", y_i)
+    return gamma, y_i
 
 
 # Barycentric 1 form interpolating polynomial
-def bary1_interpolation(x, x_values, gamma, y_values, dtype=dtype):
-    n = len(x_values)
+def bary1_interpolation(x, x_i, gamma, y_i, dtype=dtype):
+    n = len(x_i)
     l = np.ones(n, dtype=dtype)
-    w = np.prod(x - x_values)
-    p_sum = 0
-    k_num = 0
+    p_sum = np.zeros_like(x, dtype=dtype)
+    w = np.ones_like(x, dtype=dtype)
+    k_num = np.zeros_like(x, dtype=dtype)
+    k_denom = np.zeros_like(x, dtype=dtype)
+    exact = np.zeros_like(x, dtype=bool)  # Track exact matches
 
-    for i in range(n):
-        p_sum += y_values[i] * gamma[i] / (x - x_values[i])
-        for j in range(i):
-            if i != j:
-                l[i] *= (x_values[i] - x_values[j])
-        k_num += np.abs(l[i] * y_values[i])
+    for k in range(len(x)):
+        for i in range(n):
+            if x[k] == x_i[i]:  # Exact match found
+                exact[k] = True
+                p_sum[k] = y_i[i] # Directly assign function value
+                w[k] = 1
+            else:
+                w[k] *= (x[k] - x_i[i])
+                p_sum[k] += y_i[i] * gamma[i] / (x[k] - x_i[i])
+            for j in range(i):
+                if i != j:
+                    l[i] *= (x_i[i] - x_i[j])
+            k_num[k] += np.abs(l[i] * y_i[i])
+            k_denom[k] += l[i] * y_i[i]
 
-    p = np.asarray(w * p_sum, dtype=dtype)
-    cond_num = k_num / p
+    p = np.zeros_like(x, dtype=dtype)  # Initialize p before assignment
+
+    # Apply the formula only where no exact match was found
+    mask = ~exact
+    p[mask] = w[mask] * p_sum[mask]
+
+    cond_num = k_num / k_denom
+
     print("bary1_interpolation -> p:", p)
     print("bary1_interpolation -> cond_num:", cond_num)
     return p, cond_num
@@ -75,118 +91,141 @@ def bary1_interpolation(x, x_values, gamma, y_values, dtype=dtype):
 # Barycentric 2 form weights
 def bary2_weights(flag, n, f, a=-1, b=1, dtype=dtype):
     beta = np.ones(n + 1, dtype=dtype)
-    x_values = np.zeros(n + 1, dtype=dtype)
+    x_i = np.zeros(n + 1, dtype=dtype)
 
     if flag == 1:
-        x_values = np.linspace(a, b, n + 1, dtype=dtype)
+        x_i = np.linspace(a, b, n + 1, dtype=dtype)
         for i in range(n + 1):
             beta[i] = math.comb(n, i) * (-1) ** i
 
     elif flag == 2:
         for i in range(n + 1):
             rad = ((2 * i) + 1) * np.pi / (2 * (n + 1))
-            x_values[i] = math.cos(rad)
+            x_i[i] = math.cos(rad)
             beta[i] = math.sin(rad) * (-1) ** i
 
     elif flag == 3:
         for i in range(n + 1):
             rad = i * np.pi / n
-            x_values[i] = math.cos(rad)
+            x_i[i] = math.cos(rad)
             beta[i] = 0.5 * (-1) ** i if i == 0 or i == n else (-1) ** i
 
-    y_values = np.array([f(x) for x in x_values], dtype=dtype)
+    y_i = np.array([f(x) for x in x_i], dtype=dtype)
 
     print("bary2_weights -> beta:", beta)
-    print("bary2_weights -> x_values:", x_values)
-    print("bary2_weights -> y_values:", y_values)
-    return beta, x_values, y_values
+    print("bary2_weights -> x_i:", x_i)
+    print("bary2_weights -> y_i:", y_i)
+    return beta, x_i, y_i
 
 
 # Barycentric 2 form interpolating polynomial
-def bary2_interpolation(x, x_values, beta, y_values):
-    n = len(x_values)
-    num = 0
-    denom = 0
+def bary2_interpolation(x, x_i, beta, y_i):
+    n = len(x_i)
+    num = np.zeros_like(x, dtype=dtype)
+    denom = np.zeros_like(x, dtype=dtype)
+    p = np.zeros_like(x, dtype=dtype)
+    exact = np.zeros_like(x, dtype=bool)  # Track exact matches
 
-    for i in range(n):
-        num += beta[i] * y_values[i] / (x - x_values[i])
-        denom += beta[i] / (x - x_values[i])
+    for k in range(len(x)):
+        for i in range(n):
+            if x[k] == x_i[i]:  # Exact match found
+                exact[k] = True
+                p[k] = y_i[i]  # Directly assign function value
+            else:
+                term = beta[i] / (x[k] - x_i[i])
+                num[k] += term * y_i[i]
+                denom[k] += term
 
-    p = num / denom
+    # Compute p only where there was no exact match
+    mask = ~exact  # Invert boolean mask to apply standard formula
+    p[mask] = num[mask] / denom[mask]
+
     print("bary2_interpolation -> p:", p)
     return p
 
 
 # Newton Divided Differences
-def newton_divided_diff(x_values, f, dtype=dtype):
-    n = len(x_values)
-    y_values = np.array([f(x) for x in x_values], dtype=dtype)
-    y_diff = np.copy(y_values)
+def newton_divided_diff(x_i, f, dtype=dtype):
+    n = len(x_i)
+    y_i = np.array([f(x) for x in x_i], dtype=dtype)
+    y_diff = np.copy(y_i)
 
     for k in range(1, n):
-        for i in range(n - k):
+        for i in range(n-k):
             # This is the right side of the divided differences table
-            y_diff[i] = (y_diff[i + 1] - y_diff[i]) / (x_values[i + k] - x_values[i])
+            y_diff[i] = (y_diff[i + 1] - y_diff[i]) / (x_i[i + k] - x_i[i])
+
 
     print("newton_divided_diff -> y_diff:", y_diff)
-    print("newton_divided_diff -> y_values:", y_values)
-    return y_diff, y_values
+    print("newton_divided_diff -> y_i:", y_i)
+    return y_diff, y_i
 
 
 # Horner's Rule
-def horners_rule(x, x_values, y_diff):
-    n = len(x_values)
-    s = y_diff[0]
-    for i in range(n):
-        s = s * (x - x_values[i]) + y_diff[i]
+def horners_rule(x, x_i, y_diff):
+    n = len(x_i)
+    s = y_diff[0] * np.ones_like(x, dtype=dtype)
+
+    for k in range(len(x)):
+        for i in range(n):
+            s[k] = s[k] * (x[k] - x_i[i]) + y_diff[i]
 
     print("horners_rule -> s:", s)
     return s
 
 
 # Ordering Function
-def ordering(x_values, flag):
-    n = len(x_values)
+def ordering(x_i, flag):
+    n = len(x_i)
     if flag == 1:
-        x_values.sort()
+        x_i.sort()
     elif flag == 2:
-        x_values.sort(reverse=True)
+        x_i.sort(reverse=True)
     elif flag == 3:
-        leja_points = [x_values[0]]
-        remaining_points = list(x_values[1:])
+        leja_points = [x_i[0]]
+        remaining_points = list(x_i[1:])
 
         for _ in range(n - 1):
             next_point = max(remaining_points, key=lambda x: np.prod(np.abs(x - np.array(leja_points))))
             leja_points.append(next_point)
             remaining_points.remove(next_point)
 
-        x_values = np.array(leja_points)
+        x_i = np.array(leja_points)
 
-    print("ordering -> x_values:", x_values)
-    return x_values
+    print("ordering -> x_values:", x_i)
+    return x_i
 
 # Error Evaluation
 def evaluate_p(p, f, x, dtype=dtype):
-    r = np.asarray(p - f(x), dtype=dtype)
+    r = p - f(x)
     print("evaluate_p -> r:", r)
-    #return np.linalg.norm(r, ord=np.inf), np.average(r), np.var(r)
+    norm = np.linalg.norm(r, ord=np.inf)
+    print("evaluate_p -> norm:", norm)
+    avg = np.mean(r)
+    print("evaluate_p -> avg:", avg)
+    var = np.var(r)
+    print("evaluate_p -> var:", var)
+    return norm, avg, var
 
-# Sample Tests
-x_values = np.asarray([0, 0.5, 1], dtype=dtype)
+# Sample Points
+# x_i values to create interpolating polynomial
+x_i = np.asarray([0, 0.5, 1], dtype=dtype)
+# x values to test interpolating polynomial
+x = np.asarray([-1, .75, 2, 3], dtype=dtype)
 
+# Sample Function
 def f5(x): return np.asarray((6 * x) + 2, dtype=dtype)
 
-gamma, y_values = bary1_weights(x_values, f5)
-p, cond_num = bary1_interpolation(2, x_values, gamma, y_values)
+gamma, y_i = bary1_weights(x_i, f5)
+p, cond_num = bary1_interpolation(x, x_i, gamma, y_i)
 
-beta, x_values2, y_values = bary2_weights(3, 6, f5)
-x_values3 = ordering(x_values2, flag=3)
-p2 = bary2_interpolation(2, x_values2, beta, y_values)
+beta, x_i2, y_i = bary2_weights(3, 6, f5)
+x_i3 = ordering(x_i2, flag=3)
+p2 = bary2_interpolation(x, x_i2, beta, y_i)
 
-y_diff, y_values = newton_divided_diff(x_values, f5)
-s = horners_rule(2, x_values, y_diff)
+y_diff, y_i = newton_divided_diff(x_i, f5)
+s = horners_rule(x, x_i, y_diff)
 
-evaluate_p(p2, f5, 2)
-# print("norm:", norm)
-# print("avg:", avg)
-# print("diff:", diff)
+norm, avg, var = evaluate_p(p, f5, x)
+norm2, avg2, var2 = evaluate_p(p2, f5, x)
+
