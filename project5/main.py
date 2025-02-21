@@ -2,8 +2,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 import math
 
-from project4.main import order
-
 dtype = np.float64
 # dtype = np.float32
 
@@ -185,6 +183,7 @@ def relative_error(p, f_vals):
 
 
 '''------------------------ TESTER ------------------------'''
+'''------------- FUNCTIONS f1(x) f2(x) f3(x) -------------'''
 n = 29
 eps = np.finfo(float).eps
 x_test = np.linspace(0 + (10 ** 3 * eps), 0.75 - (10 ** 3 * eps), 30)
@@ -201,71 +200,71 @@ labels = [
     r"$\prod_{i=0}^9 (x-i)$",
     "Lagrange Basis Product"
 ]
-order_type = 1
-if order_type == 1:
-    order = "Increasing"
-if order_type == 2:
-    order = "Decreasing"
-if order_type == 3:
-    order = "Leja"
 
-for f, label in zip(functions, labels):
-    err_matrix_bary = []
-    err_matrix_newt = []
-    for flag in [1, 2, 3]:
-        # Barycentric interpolation
-        beta, x_i, y_i = bary2_weights(flag, n, f)
-        if label == "Lagrange Basis Product":
-            y_i = f3(x_i, x_i, dtype=dtype)
-        p_bary2 = bary2_interpolation(x_test, x_i, beta, y_i)
-        if label == "Lagrange Basis Product":
-            y_true = f3(x_test, x_i, dtype=dtype)
-        else:
-            y_true = f(x_test)
+for order_type in [1, 2, 3]:
+    if order_type == 1:
+        order = "Increasing"
+    if order_type == 2:
+        order = "Decreasing"
+    if order_type == 3:
+        order = "Leja"
+    for f, label in zip(functions, labels):
+        err_matrix_bary = []
+        err_matrix_newt = []
+        for flag in [1, 2, 3]:
+            # Barycentric interpolation
+            beta, x_i, y_i = bary2_weights(flag, n, f)
+            if label == "Lagrange Basis Product":
+                y_i = f3(x_i, x_i, dtype=dtype)
+            p_bary2 = bary2_interpolation(x_test, x_i, beta, y_i)
+            if label == "Lagrange Basis Product":
+                y_true = f3(x_test, x_i, dtype=dtype)
+            else:
+                y_true = f(x_test)
 
-        # Newton interpolation:
-        x_i = ordering(x_i, order_type)
-        # For f3, wrap it in a lambda that supplies x_i.
-        if label == "Lagrange Basis Product":
-            new_f = lambda x: f3(x, x_i, dtype=dtype)
-        else:
-            new_f = f
-        y_diff, _ = newton_divided_diff(x_i, new_f, dtype=dtype)
-        p_newton = horners_rule(x_test, x_i, y_diff)
+            # Newton interpolation:
+            x_i = ordering(x_i, order_type)
+            # For f3, wrap it in a lambda that supplies x_i.
+            if label == "Lagrange Basis Product":
+                new_f = lambda x: f3(x, x_i, dtype=dtype)
+            else:
+                new_f = f
+            y_diff, _ = newton_divided_diff(x_i, new_f, dtype=dtype)
+            p_newton = horners_rule(x_test, x_i, y_diff)
 
-        # Compute errors
-        err_bary = relative_error(p_bary2, y_true)
-        err_matrix_bary.append(err_bary)
-        err_newt = relative_error(p_newton, y_true)
-        err_matrix_newt.append(err_newt)
+            # Compute errors
+            err_bary = relative_error(p_bary2, y_true)
+            err_matrix_bary.append(err_bary)
+            err_newt = relative_error(p_newton, y_true)
+            err_matrix_newt.append(err_newt)
 
-        # Get condition number bounds
-        gamma = bary1_weights(x_i)
-        p_bary1, kappa_y, lambda_n = bary1_interpolation(x_test, x_i, gamma, y_i)
+            # Get condition number bounds
+            gamma = bary1_weights(x_i)
+            p_bary1, kappa_y, lambda_n = bary1_interpolation(x_test, x_i, gamma, y_i)
 
-    # Plot errors for Barycentric interpolation
-    plt.figure()
-    plt.plot(x_test, err_matrix_bary[0], label="Uniform", color='blue', linestyle=':')
-    plt.plot(x_test, err_matrix_bary[1], label="Chebyshev First Kind", color='red', linestyle=':')
-    plt.plot(x_test, err_matrix_bary[2], label="Chebyshev Second Kind", color='green', linestyle=':')
-    plt.axhline(y=lambda_n, color='k', linestyle='--', label='Error Bound $\Lambda_n$')
-    plt.legend()
-    plt.xlabel("x")
-    plt.ylabel("Relative Error")
-    plt.title(f"Barycentric Interpolation Errors for {label}, {order} order")
-    plt.show()
+        # Plot errors for Barycentric interpolation
+        plt.figure()
+        plt.plot(x_test, err_matrix_bary[0], label="Uniform", color='blue', linestyle=':')
+        plt.plot(x_test, err_matrix_bary[1], label="Chebyshev First Kind", color='red', linestyle=':')
+        plt.plot(x_test, err_matrix_bary[2], label="Chebyshev Second Kind", color='green', linestyle=':')
+        plt.axhline(y=lambda_n, color='k', linestyle='--', label='Error Bound $\Lambda_n$')
+        plt.legend()
+        plt.xlabel("x")
+        plt.ylabel("Relative Error")
+        plt.title(f"Barycentric Interpolation Errors for {label}")
+        plt.show()
 
-    # Plot errors for Newton interpolation
-    plt.figure()
-    plt.plot(x_test, err_matrix_newt[0], label="Uniform", color='blue', linestyle=':')
-    plt.plot(x_test, err_matrix_newt[1], label="Chebyshev First Kind", color='red', linestyle=':')
-    plt.plot(x_test, err_matrix_newt[2], label="Chebyshev Second Kind", color='green', linestyle=':')
-    plt.axhline(y=lambda_n, color='k', linestyle='--', label='Error Bound $\Lambda_n$')
-    plt.legend()
-    plt.xlabel("x")
-    plt.ylabel("Relative Error")
-    plt.title(f"Newton Interpolation Errors for {label}")
-    plt.show()
+        # Plot errors for Newton interpolation
+        plt.figure()
+        plt.plot(x_test, err_matrix_newt[0], label="Uniform", color='blue', linestyle=':')
+        plt.plot(x_test, err_matrix_newt[1], label="Chebyshev First Kind", color='red', linestyle=':')
+        plt.plot(x_test, err_matrix_newt[2], label="Chebyshev Second Kind", color='green', linestyle=':')
+        plt.axhline(y=lambda_n, color='k', linestyle='--', label='Error Bound $\Lambda_n$')
+        plt.legend()
+        plt.xlabel("x")
+        plt.ylabel("Relative Error")
+        plt.title(f"Newton Interpolation Errors for {label}, {order} order")
+        plt.show()
 
 
 
