@@ -53,7 +53,8 @@ def bary1_interpolation(x, x_i, gamma, y_i, dtype=dtype):
     n = len(x_i)
     p_sum = np.zeros_like(x, dtype=dtype)
     w = np.ones_like(x, dtype=dtype)
-    cond_num_1 = np.zeros_like(x, dtype=dtype)
+    kappa_1 = np.zeros_like(x, dtype=dtype)
+    lambda_n = np.ones_like(x, dtype=dtype)
     k_num = np.zeros_like(x, dtype=dtype)
     k_denom = np.zeros_like(x, dtype=dtype)
 
@@ -67,16 +68,17 @@ def bary1_interpolation(x, x_i, gamma, y_i, dtype=dtype):
             # Summation for numerator of interpolating condition number
             k_num[k] += np.abs(w[k] * y_i[i])
             k_denom[k] += w[k] * y_i[i]
-        cond_num_1[k] += np.abs(w[k])
+        lambda_n[k] = np.max(w)
+        kappa_1[k] += np.abs(w[k])
 
     p = w * p_sum
 
-    cond_num_y = k_num / np.abs(k_denom)
+    kappa_y = k_num / np.abs(k_denom)
 
     print("barycentric 1 -- p(x):", p)
     # print("barycentric 1 -- condition number k(x,n,y):", cond_num_y)
-    # print("barycentric 1 -- condition number k(x,n,1):", cond_num_1)
-    return p, cond_num_y, cond_num_1
+    # print("barycentric 1 -- condition number k(x,n,1):", kappa_1)
+    return p, kappa_y, kappa_1, lambda_n
 
 
 # Barycentric 2 form weights
@@ -116,22 +118,30 @@ def bary2_weights(flag, n, f, a=-1, b=1, dtype=dtype):
 # Barycentric 2 form interpolating polynomial
 def bary2_interpolation(x, x_i, beta, y_i):
     n = len(x_i)
-    num = np.zeros_like(x, dtype=dtype)
-    denom = np.zeros_like(x, dtype=dtype)
-    p = np.zeros_like(x, dtype=dtype)
+    num = np.zeros_like(x, dtype=np.float64)
+    denom = np.zeros_like(x, dtype=np.float64)
+    p = np.zeros_like(x, dtype=np.float64)
 
     for k in range(len(x)):
-        for i in range(n):
-            if np.isin(x[k],x_i):  # Exact match found
-                p[k] = y_i[i]  # Directly assign function value
+        for i in range(n):  # Ensure 'i' does not exceed 'n-1'
+            if i >= len(beta) or i >= len(y_i):  # Safety check
+                print(f"Index out of bounds: i={i}, len(beta)={len(beta)}, len(y_i)={len(y_i)}")
+                continue  # Skip iteration if an index mismatch is found
+
+            if np.isclose(x[k], x_i[i]):  # Properly check for exact match
+                p[k] = y_i[i]  # Assign function value directly
+                break
             else:
-                term = beta[i] / (x[k] - x_i[i])
+                term = beta[i] / (x[k] - x_i[i])  # Safe access
                 num[k] += term * y_i[i]
                 denom[k] += term
-    p = num / denom
+
+        if denom[k] != 0:  # Avoid division by zero
+            p[k] = num[k] / denom[k]
 
     print("barycentric 2 -- p(x):", p)
     return p
+
 
 
 # Newton Divided Differences
@@ -253,22 +263,50 @@ def evaluate_p(p, f, x, dtype=dtype):
 
 '''------------------------TESTER------------------------'''
 # Run tests for function f1, f2, f3
-x_val = np.linspace(-10, 10, 50)
-x_i = np.random.uniform(-10, 10, size=9)
-n=9
+def relative_error(p, f):
+    n = len(f)
+    err = []
+    for i in range(n):
+        err.append(np.abs(p[i] - f[i]) / f[i])
+    return err
 
+n = 29
+eps = np.finfo(float).eps
+x_test = np.linspace(-1 + (10**3 * eps), 1 - (10**3 * eps), 100)
 
-y1_val = [f1(x) for x in x_val]
-y2_val = [f2(x,n) for x in x_val]
-y3_val = [f3(x_val, x_i) for x in x_val]
 
 # Uniform Mesh
 beta, x_i, y_i = bary2_weights(1, n, f1)
-p_bary2 = bary2_interpolation(x_val, x_i, beta, y_i)
-norm1, avg1, var1 = evaluate_p(p_bary2, f1, x_val)
-plt.plot(x_val, norm1, color='blue', linestyle='dashed')
-plt.plot(x_val, p_bary2, color='red')
+p_bary2 = bary2_interpolation(x_test, x_i, beta, y_i)
+norm, avg, var = evaluate_p(p_bary2, f1, x_test)
+gamma = bary1_weights(x_i, f1)[0]
+p_bary1, kappa_y, kappa_1, lambda_n = bary1_interpolation(x_test, x_i, gamma, y_i)
+
+# Chebyshev First Kind Mesh
+beta1, x_i1, y_i1 = bary2_weights(2, n, f1)
+p_bary2_1 = bary2_interpolation(x_test, x_i1, beta, y_i1)
+norm1, avg1, var1 = evaluate_p(p_bary2_1, f1, x_test)
+gamma1 = bary1_weights(x_i, f1)[0]
+p_bary1_1, kappa_y_1, kappa_1_1, lambda_n_1 = bary1_interpolation(x_test, x_i1, gamma, y_i1)
+
+#Chebyshev Second Kind Mesh
+
+
+# Compute errors
+x_test = x_test[:-1]
+y = np.array([f1(x) for x in x_test], dtype=dtype)
+err_bary_uni = np.array(relative_error(p_bary2, y), dtype=dtype)
+err_bary_cheb1 = np.array(relative_error(p_bary2_1, y), dtype=dtype)
+
+# Plot
+plt.plot(x_test, err_bary_uni, label="Barycentric (Uniform)", color='blue')
+plt.plot(x_test, err_bary_cheb1, label="Barycentric (Chebychev)", color='red')
+plt.legend()
+plt.xlabel("x")
+plt.ylabel("Relative Error")
+plt.title("Interpolation Errors")
 plt.show()
+
 
 
 
