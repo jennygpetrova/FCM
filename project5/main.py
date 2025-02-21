@@ -2,8 +2,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import math
 
-#dtype = np.float64
-dtype = np.float32
+dtype = np.float64
+#dtype = np.float32
 
 
 # Functions f(x) for testing routines
@@ -18,8 +18,9 @@ def f2(x, d, dtype=dtype):
         y *= (x - i)
     return y
 
-def f3(x, x_i, n, dtype=dtype):
+def f3(x, x_i, dtype=dtype):
     l = np.ones_like(x, dtype=dtype)
+    n = len(x_i)
     for i in range(n):
         for j in range(n):
             if i != j:
@@ -150,19 +151,19 @@ def newton_divided_diff(x_i, f, dtype=dtype):
     return y_diff, y_i
 
 
-def newton_interpolation(x, x_i, y_diff, dtype=dtype):
-    n = len(y_diff)
-    p = np.zeros_like(x, dtype=dtype)
-
-    for k in range(len(x)):
-        p[k] = y_diff[0]
-        w = 1
-        for i in range(1, n):
-            w *= (x[k] - x_i[i - 1])
-            p[k] += y_diff[i] * w
-
-    # print("newton interpolating polynomial -- p(x):", p)
-    return p
+# def newton_interpolation(x, x_i, y_diff, dtype=dtype):
+#     n = len(y_diff)
+#     p = np.zeros_like(x, dtype=dtype)
+#
+#     for k in range(len(x)):
+#         p[k] = y_diff[0]
+#         w = 1
+#         for i in range(1, n):
+#             w *= (x[k] - x_i[i - 1])
+#             p[k] += y_diff[i] * w
+#
+#     # print("newton interpolating polynomial -- p(x):", p)
+#     return p
 
 
 # Horner's Rule
@@ -215,11 +216,11 @@ def evaluate_p(p, f, x, dtype=dtype):
     r = p - f(x)
     #print("p(x) - f(x) = r:", r)
     norm = np.linalg.norm(r, ord=np.inf)
-    print("inf norm r:", norm)
+    #print("inf norm r:", norm)
     avg = np.mean(r)
-    print("avg r:", avg)
+    #print("avg r:", avg)
     var = np.var(r)
-    print("var r:", var)
+    #print("var r:", var)
     return norm, avg, var
 
 
@@ -248,75 +249,85 @@ def evaluate_p(p, f, x, dtype=dtype):
 # norm, avg, var = evaluate_p(p, f5, x)
 
 
-# Function testing setup
-x = np.random.random(10)
-#x = np.array([-3., -2., -0.01, .25, .75, 3], dtype=dtype)
-
-# Test functions f1(x), f2(x), f3(x)
-test_functions = [
-    (lambda x: f1(x, d=2), "f1"),
-    #(lambda x: f2(x, d=3), "f2"),
-    #(lambda x: f3(x, np.linspace(-1, 1, 4), 4), "f3")  # define set of uniform x_i points
-]
-
-# Different node types for interpolation
-mesh_types = [
-    (1, "Uniform points"),
-    (2, "Chebyshev First Kind"),
-    (3, "Chebyshev Second Kind")
-]
-
-# Run tests for each function
-for f, fname in test_functions:
-    print(f"\nTesting {fname}:\n")
-
-    for flag, type in mesh_types:
-        print(f"\nUsing {type} for interpolation nodes\n")
-
-        # Barycentric 2 Interpolation
-        print("\nBarycentric 2 interpolation")
-        # Test different degree types (n) for f2 and f3
-        n = 9 # default
-        # n = 21
-        # n = 29
-        print(f"\nDegree n = {n}")
-        beta, x_i, y_i = bary2_weights(flag, n, f)
-        p_bary2 = bary2_interpolation(x, x_i, beta, y_i)
-        evaluate_p(p_bary2, f, x)
 
 
-        # Barycentric 1 Interpolation
-        print("\nBarycentric 1 interpolation")
-        gamma = bary1_weights(x_i, f)[0]
-        p_bary1, cond_num_y, cond_num_1 = bary1_interpolation(x, x_i, gamma, y_i)
-        evaluate_p(p_bary1, f, x)
+'''------------------------TESTER------------------------'''
+# Run tests for function f1, f2, f3
+x_val = np.linspace(-10, 10, 50)
+x_i = np.random.uniform(-10, 10, size=9)
+n=9
 
-        # # Newton's Interpolation
-        # print("\nNewton Interpolation")
-        # y_diff, y_i_newton = newton_divided_diff(x_i, f)
-        # p_newton = newton_interpolation(x, x_i, y_diff)
-        # print("\nNewton Interpolation for increasing order mesh points")
-        # x1 = ordering(x, 1)
-        # evaluate_p(p_newton, f, x1)
-        # print("\nNewton Interpolation for decreasing order mesh points")
-        # x2 = ordering(x, 2)
-        # evaluate_p(p_newton, f, x2)
-        # print("\nNewton Interpolation for Leja ordering mesh points")
-        # x3 = ordering(x, 3)
-        # evaluate_p(p_newton, f, x3)
-        #
-        # # Horner's Rule (Evaluation of Newton Polynomial)
-        # print("\nHorner's Rule Evaluation")
-        # p_horner = horners_rule(x, x_i, y_diff)
-        # evaluate_p(p_horner, f, x)
 
-print("------------------------------------------------------------")
+y1_val = [f1(x) for x in x_val]
+y2_val = [f2(x,n) for x in x_val]
+y3_val = [f3(x_val, x_i) for x in x_val]
 
+# Uniform Mesh
+beta, x_i, y_i = bary2_weights(1, n, f1)
+p_bary2 = bary2_interpolation(x_val, x_i, beta, y_i)
+norm1, avg1, var1 = evaluate_p(p_bary2, f1, x_val)
+plt.plot(x_val, norm1, color='blue', linestyle='dashed')
+plt.plot(x_val, p_bary2, color='red')
+plt.show()
+
+
+
+# for f, fname in test_functions:
+#     print(f"\nTesting {fname}:\n")
+#
+#     for flag, type in mesh_types:
+#         print(f"\nUsing {type} for interpolation nodes\n")
+#
+#         # Barycentric 2 Interpolation
+#         print("\nBarycentric 2 interpolation")
+#         # Test different degree types (n) for f2 and f3
+#         n = 9 # default
+#         # n = 21
+#         # n = 29
+#         print(f"\nDegree n = {n}")
+#         beta, x_i, y_i = bary2_weights(flag, n, f)
+#         p_bary2 = bary2_interpolation(x, x_i, beta, y_i)
+#         evaluate_p(p_bary2, f, x)
+#
+#
+#         # Barycentric 1 Interpolation
+#         print("\nBarycentric 1 interpolation")
+#         gamma = bary1_weights(x_i, f)[0]
+#         p_bary1, cond_num_y, cond_num_1 = bary1_interpolation(x, x_i, gamma, y_i)
+#         norm1, avg1, var1 = evaluate_p(p_bary1, f, x)
+#
+#         # Newton's Interpolation
+#         print("\nNewton Interpolation")
+#         y_diff, y_i_newton = newton_divided_diff(x_i, f)
+#         print("\nNewton Interpolation for increasing order mesh points")
+#         x1 = ordering(x, 1)
+#         norm2, avg2, var2 = evaluate_p(p_newton, f, x1)
+#         print("\nNewton Interpolation for decreasing order mesh points")
+#         x2 = ordering(x, 2)
+#         norm3, avg3, var3 = evaluate_p(p_newton, f, x2)
+#         print("\nNewton Interpolation for Leja ordering mesh points")
+#         x3 = ordering(x, 3)
+#         norm4, avg4, var4 = evaluate_p(p_newton, f, x3)
+#
+#         # Horner's Rule (Evaluation of Newton Polynomial)
+#         print("\nHorner's Rule Evaluation")
+#         p_horner = horners_rule(x, x_i, y_diff)
+#         norm5, avg5, var5 = evaluate_p(p_horner, f, x)
+
+
+
+
+
+
+
+
+# print("------------------------------------------------------------")
+#
 # # Test function f4(x)
 # print("\nTesting f4:\n")
-# n_values = [5, 10, 16, 21, 30]
-# for n in n_values:
-#     for flag, type in mesh_types:
+# n_values = [5, 10, 15, 20, 25]
+# for flag, type in mesh_types:
+#     for n in n_values:
 #         print(f"\nUsing {type} for interpolation nodes\n")
 #
 #         # Barycentric 2 Interpolation
@@ -324,39 +335,66 @@ print("------------------------------------------------------------")
 #         print(f"\nDegree n = {n}")
 #         beta, x_i, y_i = bary2_weights(flag, n, f)
 #         p_bary2 = bary2_interpolation(x, x_i, beta, y_i)
-#         evaluate_p(p_bary2, f, x)
+#         norm, avg, var = evaluate_p(p_bary2, f, x)
 #
 #         # Newton's Interpolation
 #         print("\nNewton Interpolation")
 #         y_diff = newton_divided_diff(x_i, f)[0]
-#         p_newton = newton_interpolation(x, x_i, y_diff)
 #         print("\nNewton Interpolation for increasing order mesh points")
 #         x1 = ordering(x, 1)
-#         evaluate_p(p_newton, f, x1)
+#         norm1, avg1, var1 = evaluate_p(p_newton, f, x1)
 #         print("\nNewton Interpolation for decreasing order mesh points")
 #         x2 = ordering(x, 2)
-#         evaluate_p(p_newton, f, x2)
+#         norm2, avg2, var2 = evaluate_p(p_newton, f, x2)
 #         print("\nNewton Interpolation for Leja ordering mesh points")
 #         x3 = ordering(x, 3)
-#         evaluate_p(p_newton, f, x3)
+#         norm3, avg3, var3 = evaluate_p(p_newton, f, x3)
 
 
 
-# # Run tests for f4(x)
-# def summarize_conditioning(cond_num_y, cond_num_1):
-#     Λn = np.max(cond_num_y)  # Max condition number
-#     Hn = np.mean(cond_num_y)  # Average condition number
-#     stats = {
-#         "Λn (max cond num)": Λn,
-#         "Hn (avg cond num)": Hn,
-#         "Min κ(x, n, y)": np.min(cond_num_y),
-#         "Max κ(x, n, y)": np.max(cond_num_y),
-#         "Var κ(x, n, y)": np.var(cond_num_y),
-#         "Min κ(x, n, 1)": np.min(cond_num_1),
-#         "Max κ(x, n, 1)": np.max(cond_num_1),
-#         "Var κ(x, n, 1)": np.var(cond_num_1)
-#     }
-#     return stats
+
+
+# # Tester for functions 1-3
+# conditions = {}
+# for f, fname in test_functions:
+#     for flag in mesh_types:
+#         beta, x_i, y_i = bary2_weights(flag, 9, f)
+#         p_bary2 = bary2_interpolation(x_eval, x_i, beta, y_i)
+#         gamma = bary1_weights(x_i, f)[0]
+#         p_bary1, cond_num_y, cond_num_1 = bary1_interpolation(x_eval, x_i, gamma, y_i)
+#         norm, avg, var = evaluate_p(p_bary2, f, x_eval)
+#         conditions[f"{fname}-flag{flag}"] = cond_num_y, cond_num_1
+#
+#         plt.figure()
+#         plt.plot(x_eval, f(x_eval), label=f'{fname}(x)', linestyle='dashed')
+#         plt.plot(x_eval, p_bary2, label=f'Interpolant {fname} (flag {flag})', alpha=0.7)
+#         plt.scatter(x_i, y_i, color='red', zorder=3)
+#         plt.xlabel('x')
+#         plt.ylabel('y')
+#         plt.legend()
+#         plt.title(f'Interpolation for {fname} (flag {flag})')
+#         plt.show()
+#
+#
+# # Investigate convergence behavior for f4
+# plt.figure(figsize=(10, 6))
+# for flag in mesh_types:
+#     errors = []
+#     for n in range(5, 51, 5):
+#         beta, x_i, y_i = bary2_weights(flag, n, f4)
+#         p_bary2 = bary2_interpolation(x_eval, x_i, beta, y_i)
+#         norm, avg, var = evaluate_p(p_bary2, f, x_eval)
+#     plt.plot(range(5, 51, 5), norm, marker='o', label=f'flag {flag}')
+#
+# plt.xlabel('n')
+# plt.ylabel('Infinity Norm of Error')
+# plt.title('Convergence of f4 Approximation for Different Mesh Types')
+# plt.legend()
+# plt.grid()
+# plt.show()
+
+
+
 
 
 
