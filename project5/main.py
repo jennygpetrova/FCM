@@ -44,35 +44,74 @@ def bary1_weights(x_i, dtype=dtype):
     return gamma
 
 
-def bary1_interpolation(x, x_i, gamma, y_i, dtype=dtype):
+def bary1_interpolation(x, x_i, gamma, y_i, dtype=np.float64):
     n = len(x_i)
     p = np.zeros_like(x, dtype=dtype)
     p_sum = np.zeros_like(x, dtype=dtype)
     w = np.ones_like(x, dtype=dtype)
-    k_num = np.zeros_like(x, dtype=dtype)
-    k_denom = np.zeros_like(x, dtype=dtype)
-    kappa_1 = np.zeros_like(x, dtype=dtype)
+    kappa_num = np.zeros_like(x, dtype=dtype)  # Numerator of κ(x, n, y)
+    kappa_denom = np.zeros_like(x, dtype=dtype)  # Denominator of κ(x, n, 1)
 
     for k in range(len(x)):
+        exact_match = False
         for i in range(n):
-            # If x[k] is very close to any node, we directly assign y_i to p_sum[k].
-            if np.isclose(x[k], x_i, rtol=1e-05, atol=1e-08).any():
-                p[k] += y_i[i]
+            if np.isclose(x[k], x_i[i], rtol=1e-12, atol=1e-15):  # Exact match
+                p[k] = y_i[i]
+                exact_match = True
+                break
             else:
-                w[k] *= (x[k] - x_i[i])
-                p_sum[k] += y_i[i] * gamma[i] / (x[k] - x_i[i])
-            p[k] += w[k] * p_sum[k]
-            l_i = f3(x[k], x_i, i)
-            k_num[k] += np.abs(p[k])
-            k_denom[k] += l_i
-        if np.abs(w[k]) < 1:
-            kappa_1[k] = 1
-        else:
-            kappa_1[k] += np.abs(l_i)
-    lambda_n = np.max(kappa_1)
-    kappa_y = k_num / np.abs(k_denom)
-    print("barycentric 1 -- p(x):", p)
+                term = gamma[i] / (x[k] - x_i[i])
+                w[k] *= (x[k] - x_i[i])  # Product form of li(x)
+                p_sum[k] += term * y_i[i]
+
+        if not exact_match:
+            p[k] = w[k] * p_sum[k]  # Interpolated value
+
+            # Compute κ(x, n, y) numerator
+            kappa_num[k] = np.abs(p[k])
+
+            # Compute κ(x, n, 1) denominator
+            kappa_denom[k] = np.abs(w[k])  # Use absolute values to avoid cancellation issues
+
+    # Compute the interpolation condition number κ(x, n, y)
+    kappa_y = kappa_num / kappa_denom
+    lambda_n = np.max(kappa_denom)  # Maximum condition number bound
+
+    print("Barycentric Form 1 -- Interpolated p(x):", p)
+    print("Interpolation Condition Number κ(x, n, y):", kappa_y)
+
     return p, kappa_y, lambda_n
+
+
+# def bary1_interpolation(x, x_i, gamma, y_i, dtype=dtype):
+#     n = len(x_i)
+#     p = np.zeros_like(x, dtype=dtype)
+#     p_sum = np.zeros_like(x, dtype=dtype)
+#     w = np.ones_like(x, dtype=dtype)
+#     k_num = np.zeros_like(x, dtype=dtype)
+#     k_denom = np.zeros_like(x, dtype=dtype)
+#     kappa_1 = np.zeros_like(x, dtype=dtype)
+#
+#     for k in range(len(x)):
+#         for i in range(n):
+#             # If x[k] is very close to any node, we directly assign y_i to p_sum[k].
+#             if np.isclose(x[k], x_i, rtol=1e-05, atol=1e-08).any():
+#                 p[k] += y_i[i]
+#             else:
+#                 w[k] *= (x[k] - x_i[i])
+#                 p_sum[k] += y_i[i] * gamma[i] / (x[k] - x_i[i])
+#             p[k] += w[k] * p_sum[k]
+#             l_i = f3(x[k], x_i, i)
+#             k_num[k] += np.abs(p[k])
+#             k_denom[k] += l_i
+#         if np.abs(w[k]) < 1:
+#             kappa_1[k] = 1
+#         else:
+#             kappa_1[k] += np.abs(l_i)
+#     lambda_n = np.max(kappa_1)
+#     kappa_y = k_num / np.abs(k_denom)
+#     print("barycentric 1 -- p(x):", p)
+#     return p, kappa_y, lambda_n
 
 
 # Barycentric 2 form weights and interpolation
@@ -196,7 +235,7 @@ def relative_error(p, f_vals):
 '''------------- FUNCTIONS f1(x) f2(x) f3(x) f4(x) -------------'''
 n = 29
 eps = np.finfo(float).eps
-x_test = np.linspace(0 + (10 ** 3 * eps), 0.75 - (10 ** 3 * eps), 100)
+x_test = np.linspace(-1 + (10 ** 3 * eps), 0.1 - (10 ** 3 * eps), 100)
 functions = [
     f1,
     lambda x: f2(x, d=9),
