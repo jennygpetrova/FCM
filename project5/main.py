@@ -38,80 +38,36 @@ def bary1_weights(x_i, dtype=dtype):
     n = len(x_i)
     gamma = np.ones(n, dtype=dtype)
     for i in range(n):
+        prod = 1
         for j in range(n):
             if i != j:
-                gamma[i] /= (x_i[i] - x_i[j])
+                prod *= (x_i[i] - x_i[j])
+        gamma[i] = 1 / prod
     return gamma
 
 
-def bary1_interpolation(x, x_i, gamma, y_i, dtype=np.float64):
+def bary1_interpolation(x, x_i, gamma, y_i, dtype=dtype):
     n = len(x_i)
     p = np.zeros_like(x, dtype=dtype)
-    p_sum = np.zeros_like(x, dtype=dtype)
-    w = np.ones_like(x, dtype=dtype)
-    kappa_num = np.zeros_like(x, dtype=dtype)  # Numerator of κ(x, n, y)
-    kappa_denom = np.zeros_like(x, dtype=dtype)  # Denominator of κ(x, n, 1)
 
     for k in range(len(x)):
+        num = 0
+        denom = 0
         exact_match = False
+
         for i in range(n):
-            if np.isclose(x[k], x_i[i], rtol=1e-12, atol=1e-15):  # Exact match
+            if np.isclose(x[k], x_i[i], atol=1e-12):
                 p[k] = y_i[i]
                 exact_match = True
                 break
-            else:
-                term = gamma[i] / (x[k] - x_i[i])
-                w[k] *= (x[k] - x_i[i])  # Product form of li(x)
-                p_sum[k] += term * y_i[i]
+            term = gamma[i] / (x[k] - x_i[i])
+            num += term * y_i[i]
+            denom += term
 
         if not exact_match:
-            p[k] = w[k] * p_sum[k]  # Interpolated value
+            p[k] = num / denom
 
-            # Compute κ(x, n, y) numerator
-            kappa_num[k] = np.abs(p[k])
-
-            # Compute κ(x, n, 1) denominator
-            kappa_denom[k] = np.abs(w[k])  # Use absolute values to avoid cancellation issues
-
-    # Compute the interpolation condition number κ(x, n, y)
-    kappa_y = kappa_num / kappa_denom
-    lambda_n = np.max(kappa_denom)  # Maximum condition number bound
-
-    print("Barycentric Form 1 -- Interpolated p(x):", p)
-    print("Interpolation Condition Number κ(x, n, y):", kappa_y)
-
-    return p, kappa_y, lambda_n
-
-
-# def bary1_interpolation(x, x_i, gamma, y_i, dtype=dtype):
-#     n = len(x_i)
-#     p = np.zeros_like(x, dtype=dtype)
-#     p_sum = np.zeros_like(x, dtype=dtype)
-#     w = np.ones_like(x, dtype=dtype)
-#     k_num = np.zeros_like(x, dtype=dtype)
-#     k_denom = np.zeros_like(x, dtype=dtype)
-#     kappa_1 = np.zeros_like(x, dtype=dtype)
-#
-#     for k in range(len(x)):
-#         for i in range(n):
-#             # If x[k] is very close to any node, we directly assign y_i to p_sum[k].
-#             if np.isclose(x[k], x_i, rtol=1e-05, atol=1e-08).any():
-#                 p[k] += y_i[i]
-#             else:
-#                 w[k] *= (x[k] - x_i[i])
-#                 p_sum[k] += y_i[i] * gamma[i] / (x[k] - x_i[i])
-#             p[k] += w[k] * p_sum[k]
-#             l_i = f3(x[k], x_i, i)
-#             k_num[k] += np.abs(p[k])
-#             k_denom[k] += l_i
-#         if np.abs(w[k]) < 1:
-#             kappa_1[k] = 1
-#         else:
-#             kappa_1[k] += np.abs(l_i)
-#     lambda_n = np.max(kappa_1)
-#     kappa_y = k_num / np.abs(k_denom)
-#     print("barycentric 1 -- p(x):", p)
-#     return p, kappa_y, lambda_n
+    return p
 
 
 # Barycentric 2 form weights and interpolation
@@ -173,15 +129,6 @@ def newton_divided_diff(x_i, y_i, dtype=dtype):
 
     return divided_diff[0, :]
 
-    # n = len(x_i)
-    # y_diff = np.zeros_like(x_i, dtype=dtype)
-    # y_diff[0] = y_i[0]
-    # for k in range(1, n):
-    #     for i in range(n - k):
-    #         y_i[i] = (y_i[i + 1] - y_i[i]) / (x_i[i + k] - x_i[i])
-    #     y_diff[k] = y_i[0]
-    # return y_diff, y_i
-
 
 # Vectorized Horner's Rule for Newton interpolation
 def horners_rule(x, x_i, y_diff):
@@ -202,9 +149,9 @@ def ordering(x_i, flag):
         x_remaining = np.copy(x_i)
         x_leja = [x_remaining[0]]
         x_remaining = np.delete(x_remaining, 0)
+
         while len(x_remaining) > 0:
-            for x in x_remaining:
-                prod = np.array([np.prod(np.abs(x - np.array(x_leja)))])
+            prod = np.array([np.prod(np.abs(x - np.array(x_leja))) for x in x_remaining])
             index = np.argmax(prod)
             x_leja.append(x_remaining[index])
             x_remaining = np.delete(x_remaining, index)
@@ -212,8 +159,8 @@ def ordering(x_i, flag):
     return x_i
 
 
-def evaluate_p(p, f, x, dtype=dtype):
-    r = p - f(x)
+def evaluate_p(p, y, dtype=dtype):
+    r = p - y
     norm = np.linalg.norm(r, ord=np.inf)
     print("inf norm r:", norm)
     avg = np.mean(r)
@@ -221,30 +168,17 @@ def evaluate_p(p, f, x, dtype=dtype):
     return norm, avg, var
 
 
-def relative_error(p, f_vals):
-    err = []
-    for i in range(len(f_vals)):
-        if np.abs(f_vals[i]) > 1e-14:
-            err.append(np.abs(p[i] - f_vals[i]) / np.abs(f_vals[i]))
-        else:
-            err.append(np.abs(p[i] - f_vals[i]))
-    return np.array(err)
+def relative_error(p, y_true):
+    return np.abs(p - y_true) / np.abs(y_true)
 
 
 '''------------------------ TESTER ------------------------'''
-'''------------- FUNCTIONS f1(x) f2(x) f3(x) f4(x) -------------'''
+'''------------- FUNCTIONS f1(x) f2(x) f3(x) -------------'''
 n = 29
 eps = np.finfo(float).eps
-x_test = np.linspace(-1 + (10 ** 3 * eps), 0.1 - (10 ** 3 * eps), 100)
-functions = [
-    f1,
-    lambda x: f2(x, d=9),
-    f3 ]
-labels = [
-    r"$(x-2)^9$",
-    r"$\prod_{i=0}^9 (x-i)$",
-    "Lagrange Basis Product"
-]
+x_test = np.linspace(-1 + (10 ** 3 * eps), 1 - (10 ** 3 * eps), 100)
+functions = [f1,f2,f3]
+labels = [r"$(x-2)^9$", r"$\prod_{i=0}^9 (x-i)$", "Lagrange Basis Product"]
 
 for order_type in [1, 2, 3]:
     if order_type == 1:
@@ -260,19 +194,18 @@ for order_type in [1, 2, 3]:
         for flag in [1, 2, 3]:
             # Barycentric interpolation
             beta, x_i = bary2_weights(flag, n)
+
             if f == f1:
                 y_i = f1(x_i)
-            elif f == f2:
-                y_i = f2(x_i, 9)
-            else:
-                y_i = f3(x_i, x_i, n)
-            p_bary2 = bary2_interpolation(x_test, x_i, beta, y_i)
-            if f == f1:
                 y_true = f1(x_test)
             elif f == f2:
+                y_i = f2(x_i, 9)
                 y_true = f2(x_test, 9)
             else:
+                y_i = f3(x_i, x_i, n)
                 y_true = f3(x_test, x_i, n)
+
+            p_bary2 = bary2_interpolation(x_test, x_i, beta, y_i)
 
             # Newton interpolation:
             x_i = ordering(x_i, order_type)
@@ -285,16 +218,11 @@ for order_type in [1, 2, 3]:
             err_newt = relative_error(p_newton, y_true)
             err_matrix_newt.append(err_newt)
 
-            # Get condition number bounds
-            gamma = bary1_weights(x_i)
-            p_bary1, kappa_y, lambda_n = bary1_interpolation(x_test, x_i, gamma, y_i)
-
         # Plot errors for Barycentric interpolation
         plt.figure()
         plt.plot(x_test, err_matrix_bary[0], label="Uniform", color='blue', linestyle=':')
         plt.plot(x_test, err_matrix_bary[1], label="Chebyshev First Kind", color='red', linestyle=':')
         plt.plot(x_test, err_matrix_bary[2], label="Chebyshev Second Kind", color='green', linestyle=':')
-        plt.axhline(y=lambda_n, color='k', linestyle='--', label='Error Bound $\Lambda_n$')
         plt.legend()
         plt.xlabel("x")
         plt.ylabel("Relative Error")
@@ -306,7 +234,6 @@ for order_type in [1, 2, 3]:
         plt.plot(x_test, err_matrix_newt[0], label="Uniform", color='blue', linestyle=':')
         plt.plot(x_test, err_matrix_newt[1], label="Chebyshev First Kind", color='red', linestyle=':')
         plt.plot(x_test, err_matrix_newt[2], label="Chebyshev Second Kind", color='green', linestyle=':')
-        plt.axhline(y=lambda_n, color='k', linestyle='--', label='Error Bound $\Lambda_n$')
         plt.legend()
         plt.xlabel("x")
         plt.ylabel("Relative Error")
@@ -316,65 +243,51 @@ for order_type in [1, 2, 3]:
 
 '''------------------------ TESTER ------------------------'''
 '''-------------------- FUNCTION f4(x) --------------------'''
+
+# Define Testing Parameters
 n_values = [10, 20, 25, 29, 30]
+x_test = np.linspace(-1, 1, 100)  # Fine grid for error analysis
+y_true = f4(x_test)
 mesh_labels = {1: "Uniform", 2: "Chebyshev First Kind", 3: "Chebyshev Second Kind"}
+colors = ["blue", "red", "green", "purple", "orange"]  # For different n values
 order_types = {1: "Increasing", 2: "Decreasing", 3: "Leja"}
-colors = ["blue", "red", "green", "purple", "orange"]
 
 # Loop over mesh types (Uniform, Chebyshev 1st Kind, Chebyshev 2nd Kind)
 for flag in [1, 2, 3]:
-    # **Barycentric Interpolation Error Plot**
-    plt.figure(figsize=(10, 6))  # Create a figure for Barycentric errors
-
-    for idx, n in enumerate(n_values):
-        beta, x_i = bary2_weights(flag, n)
-        y_i = f4(x_i)
-        p_bary2 = bary2_interpolation(x_test, x_i, beta, y_i)
-
-        y_true = f4(x_test)
-        err_bary = relative_error(p_bary2, y_true)
-
-        # Plot Barycentric Errors
-        plt.plot(x_test, err_bary, label=f"Barycentric (n={n})", linestyle=':', color=colors[idx])
+    for order in order_types:
+        plt.figure(figsize=(10, 6))
+        for idx, n in enumerate(n_values):
+            beta, x_i = bary2_weights(flag, n)
+            x_i = ordering(x_i, order)
+            y_i = f4(x_i)
+            p_bary2 = bary2_interpolation(x_test, x_i, beta, y_i)
+            err_bary = relative_error(p_bary2, y_true)
+            plt.plot(x_test, err_bary, label=f"Barycentric (n={n})", linestyle=':', color=colors[idx])
 
     plt.xlabel("x")
     plt.ylabel("Relative Error")
     plt.yscale("log")  # Log scale for better visualization
-    plt.title(f"Barycentric Interpolation Errors for {mesh_labels[flag]} Mesh")
+    plt.title(f"Barycentric Interpolation Errors for {mesh_labels[flag]}, {order_types[order]} order")
     plt.legend()
     plt.grid()
     plt.show()
 
-    # **Newton Interpolation Error Plot**
-    plt.figure(figsize=(10, 6))  # Create a separate figure for Newton errors
-
-    for order in [1, 2, 3]:
+for flag in [1, 2, 3]:
+    for order in order_types:
+        plt.figure(figsize=(10, 6))
         for idx, n in enumerate(n_values):
             beta, x_i = bary2_weights(flag, n)
-            y_i = f4(x_i)
             x_i = ordering(x_i, order)
+            y_i = f4(x_i)
             y_diff = newton_divided_diff(x_i, y_i)
             p_newton = horners_rule(x_test, x_i, y_diff)
-
-            y_true = f4(x_test)
             err_newt = relative_error(p_newton, y_true)
-
-            # Plot Newton Errors
             plt.plot(x_test, err_newt, label=f"Newton (n={n})", linestyle='--', color=colors[idx])
 
         plt.xlabel("x")
         plt.ylabel("Relative Error")
         plt.yscale("log")  # Log scale for better visualization
-        plt.title(f"Newton Interpolation Errors for {mesh_labels[flag]}, order {order_types[order]}")
+        plt.title(f"Barycentric Interpolation Errors for {mesh_labels[flag]}, {order_types[order]} order")
         plt.legend()
         plt.grid()
         plt.show()
-
-
-
-
-
-
-
-
-
