@@ -72,7 +72,10 @@ def piecewise_polynomial(f, a, b, num_sub, x, degree, global_method, local_metho
     if global_method == 0:
         I = np.linspace(a, b, num_sub + 1)
     else:
-        I = chebyshev_nodes(num_sub, a, b, global_method)
+        I = np.sort(chebyshev_nodes(num_sub, a, b, global_method))
+        # Force the endpoints to be exactly a and b
+        I[0] = a
+        I[-1] = b
 
     sub_data = []
     for i in range(num_sub):
@@ -124,6 +127,7 @@ def piecewise_polynomial(f, a, b, num_sub, x, degree, global_method, local_metho
         data = sub_data[sub_int]
         g[i] = newton_polynomial(x[i], data['x_nodes'], data['coeff'])
     return g
+
 
 # ------------------------------------------------------------
 # Part 3: Spline Code 2: Cubic B-spline Basis Interpolation
@@ -200,61 +204,53 @@ def cubic_spline2_polynomial(x_nodes, t):
     return B
 
 
-# Example usage:
-if __name__ == '__main__':
-    # Example nodes and evaluation points:
-    x_nodes = np.array([1, 3, 5, 7, 9])
-    t = [0, 2.5, 6, 10]
-    B_vals = cubic_spline2_polynomial(x_nodes, t)
-    print("B(t) =", B_vals)
-
 # ------------------------------------------------------------
 # Testing Functions
 # ------------------------------------------------------------
-def f(x):
-    return 1 / (x ** 3)
-
-def fprime(x):
-    return (-3) / (x ** 4)
-
-def fprime2(x):
-    return 12 / (x ** 5)
-
-x_eval = (2, 4, 6)
-x_nodes = np.array([1, 3, 5, 7, 8])
-print("x_nodes:", x_nodes)
-y_nodes = f(x_nodes)
-print("y_nodes:", y_nodes)
-
-# Testing Newton divided differences with derivative (for Hermite)
-coeff, coeff_spline = newton_divided_diff(x_nodes, y_nodes, fprime=fprime)
-print("Newton Coefficients:", coeff)
-print("Second Order Divided Differences:", coeff_spline)
-
-# Evaluate the Newton polynomial (using full nodes as x_nodes here for a simple test)
-p = newton_polynomial(x_nodes, x_nodes, coeff)
-print("Newton Polynomial Evaluation:", p)
-
-# Testing piecewise polynomial with Hermite interpolation
-g = piecewise_polynomial(f, 0, 5, 5, x_nodes, 3, 0, 2, hermite=True, fprime=fprime)
-print("Piecewise Polynomial Evaluation:", g)
-
-# Testing the cubic spline coefficient matrix
-matrix, d = cubic_spline_coefficients(x_nodes, coeff_spline, fprime2)
-print("Cubic Spline Coefficient Matrix:")
-print(matrix)
-print("Cubic Spline Coefficients:")
-print(d)
-
-matrix_inv = np.linalg.inv(matrix)
-s = np.dot(matrix_inv, d)
-print("s''(x): ", s)
-
-p2 = cubic_spline1_polynomial(x_nodes, y_nodes, x_eval, s)
-print("Cubic Spline Polynomial Evaluation:", p2)
-
-p3 = piecewise_polynomial(f, 0, 5, 5, x_eval, 3, 0, 2, hermite=False, fprime=fprime2)
-print("Piecewise Polynomial Evaluation:", p3)
+# def f(x):
+#     return (x ** 3) + (2 * x ** 2)
+#
+# def fprime(x):
+#     return (3 * x ** 2) + (4 * x)
+#
+# def fprime2(x):
+#     return (6 * x) + 4
+#
+# x_eval = (2, 4, 6)
+# x_nodes = np.array([1, 3, 5, 7, 8])
+# print("x_nodes:", x_nodes)
+# y_nodes = f(x_nodes)
+# print("y_nodes:", y_nodes)
+#
+# # Testing Newton divided differences with derivative (for Hermite)
+# coeff, coeff_spline = newton_divided_diff(x_nodes, y_nodes, fprime=fprime)
+# print("Newton Coefficients:", coeff)
+# print("Second Order Divided Differences:", coeff_spline)
+#
+# # Evaluate the Newton polynomial (using full nodes as x_nodes here for a simple test)
+# p = newton_polynomial(x_nodes, x_nodes, coeff)
+# print("Newton Polynomial Evaluation:", p)
+#
+# # Testing piecewise polynomial with Hermite interpolation
+# g = piecewise_polynomial(f, 0, 5, 5, x_eval, 3, 0, 2, hermite=True, fprime=fprime)
+# print("Piecewise Polynomial Evaluation:", g)
+#
+# # Testing the cubic spline coefficient matrix
+# matrix, d = cubic_spline_coefficients(x_eval, coeff_spline, fprime2)
+# print("Cubic Spline Coefficient Matrix:")
+# print(matrix)
+# print("Cubic Spline Coefficients:")
+# print(d)
+#
+# matrix_inv = np.linalg.inv(matrix)
+# s = np.dot(matrix_inv, d)
+# print("s''(x): ", s)
+#
+# p2 = cubic_spline1_polynomial(x_nodes, y_nodes, x_eval, s)
+# print("Cubic Spline Polynomial Evaluation:", p2)
+#
+# p3 = piecewise_polynomial(f, 0, 5, 5, x_eval, 3, 0, 2, hermite=False, fprime=fprime2)
+# print("Piecewise Polynomial Evaluation:", p3)
 #
 # # Example usage:
 # if __name__ == '__main__':
@@ -281,3 +277,163 @@ print("Piecewise Polynomial Evaluation:", p3)
 #     plt.title('Cubic Spline Interpolation (Natural BC)')
 #     plt.legend()
 #    plt.show()
+
+
+# Assume that all the functions from your provided code are defined here:
+# chebyshev_nodes, barycentric_weights, barycentric_interpolation,
+# newton_divided_diff, newton_polynomial, piecewise_polynomial,
+# cubic_spline_coefficients, cubic_spline1_polynomial, cubic_spline2_polynomial
+
+# -----------------------------
+# Test 1: Barycentric Interpolation on a Cubic Polynomial
+# -----------------------------
+def g_cubic(x):
+    return 1 + 2 * x + 3 * x ** 2 + 4 * x ** 3
+
+# Define the interval and nodes
+a, b = -1, 1
+n = 3  # degree 3 -> 4 nodes exactly
+nodes = chebyshev_nodes(n, a, b, kind=1)
+weights = barycentric_weights(nodes)
+y_nodes = g_cubic(nodes)
+
+# Evaluate on a dense grid
+x_dense = np.linspace(a, b, 200)
+p_bary = barycentric_interpolation(x_dense, nodes, weights, y_nodes)
+error_bary = np.max(np.abs(g_cubic(x_dense) - p_bary))
+print("Test 1: Barycentric Interpolation max error (cubic):", error_bary)
+
+plt.figure()
+plt.plot(x_dense, g_cubic(x_dense), 'k-', label="g(x) exact")
+plt.plot(x_dense, p_bary, 'r--', label="Barycentric interp.")
+plt.scatter(nodes, y_nodes, c='blue', zorder=5, label="Nodes")
+plt.title("Barycentric Interpolation on Cubic Function")
+plt.legend()
+plt.show()
+
+# -----------------------------
+# Test 2: Piecewise Polynomial Interpolation on a Cubic Function
+# -----------------------------
+# We divide the interval into 2 subintervals.
+num_sub = 4
+# For a cubic function, using degree=3 on each subinterval should be exact.
+p_piecewise = piecewise_polynomial(g_cubic, a, b, num_sub, x_dense, degree=3,
+                                   global_method=1, local_method=1)
+error_piecewise = np.max(np.abs(g_cubic(x_dense) - p_piecewise))
+print("Test 2: Piecewise Polynomial Interpolation max error (cubic):", error_piecewise)
+
+plt.figure()
+plt.plot(x_dense, g_cubic(x_dense), 'k-', label="g(x) exact")
+plt.plot(x_dense, p_piecewise, 'g--', label="Piecewise poly interp.")
+plt.title("Piecewise Polynomial Interpolation on Cubic Function")
+plt.legend()
+plt.show()
+
+
+# -----------------------------
+# Test 3: Cubic Spline Interpolation (Spline Code 1) on a Cubic Function
+# -----------------------------
+# For a cubic function, the natural cubic spline (with second derivative matching at endpoints)
+# should exactly reproduce the function.
+# Choose a set of nodes and compute the second derivative function for g_cubic.
+def g_doubleprime(x):
+    # Second derivative of 1+2x+3x^2+4x^3 is: 6 + 24x.
+    return 6 + 24 * x
+
+
+# Choose nodes (here we use 5 nodes for a smoother spline test)
+x_nodes = np.linspace(a, b, 5)
+y_nodes = g_cubic(x_nodes)
+
+# Compute the "coefficients" needed for the spline:
+# For spline code 1, we require a right-hand side based on divided differences.
+# Here, we construct a dummy coefficient array for the internal nodes.
+# (In practice, for an exact cubic, the spline with matching f'' should be exact.)
+# Compute second derivative values at endpoints.
+matrix, d = cubic_spline_coefficients(x_nodes, np.gradient(y_nodes, x_nodes), g_doubleprime)
+s = np.linalg.solve(matrix, d)
+spline1 = cubic_spline1_polynomial(x_nodes, y_nodes, x_dense, s)
+error_spline1 = np.max(np.abs(g_cubic(x_dense) - spline1))
+print("Test 3: Cubic Spline (Code 1) max error (cubic):", error_spline1)
+
+plt.figure()
+plt.plot(x_dense, g_cubic(x_dense), 'k-', label="g(x) exact")
+plt.plot(x_dense, spline1, 'm--', label="Cubic Spline Code 1")
+plt.title("Cubic Spline (Code 1) on Cubic Function")
+plt.legend()
+plt.show()
+
+# -----------------------------
+# Test 4: Cubic Spline Interpolation (Spline Code 2) on a Cubic Function
+# -----------------------------
+# Note: cubic_spline2_polynomial expects x_nodes of length 5.
+# We use the same x_nodes as in Test 3.
+# Compute B-spline basis interpolation values.
+spline2 = cubic_spline2_polynomial(x_nodes, x_dense)
+# For a cubic function, a well‐designed B-spline interpolation should have very low error.
+error_spline2 = np.max(np.abs(g_cubic(x_dense) - spline2))
+print("Test 4: Cubic Spline (Code 2) max error (cubic):", error_spline2)
+
+plt.figure()
+plt.plot(x_dense, g_cubic(x_dense), 'k-', label="g(x) exact")
+plt.plot(x_dense, spline2, 'c--', label="Cubic Spline Code 2")
+plt.title("Cubic Spline (Code 2) on Cubic Function")
+plt.legend()
+plt.show()
+
+
+# -----------------------------
+# Test 5: Comparison on a Non-Polynomial Function (e.g., sin(x))
+# -----------------------------
+def f_sin(x):
+    return np.sin(x)
+
+
+a_sin, b_sin = 0, np.pi
+x_dense_sin = np.linspace(a_sin, b_sin, 200)
+n_sin = 10  # number of nodes for barycentric
+nodes_sin = chebyshev_nodes(n_sin, a_sin, b_sin, kind=1)
+weights_sin = barycentric_weights(nodes_sin)
+y_nodes_sin = f_sin(nodes_sin)
+p_bary_sin = barycentric_interpolation(x_dense_sin, nodes_sin, weights_sin, y_nodes_sin)
+p_piecewise_sin = piecewise_polynomial(f_sin, a_sin, b_sin, num_sub=4, x=x_dense_sin, degree=3,
+                                       global_method=1, local_method=1)
+
+plt.figure()
+plt.plot(x_dense_sin, f_sin(x_dense_sin), 'k-', label="sin(x) exact")
+plt.plot(x_dense_sin, p_bary_sin, 'r--', label="Barycentric")
+plt.plot(x_dense_sin, p_piecewise_sin, 'g--', label="Piecewise Poly")
+plt.title("Comparison on sin(x)")
+plt.legend()
+plt.show()
+
+error_bary_sin = np.max(np.abs(f_sin(x_dense_sin) - p_bary_sin))
+error_piecewise_sin = np.max(np.abs(f_sin(x_dense_sin) - p_piecewise_sin))
+print("Test 5: sin(x) Barycentric max error:", error_bary_sin)
+print("Test 5: sin(x) Piecewise Poly max error:", error_piecewise_sin)
+
+
+# -----------------------------
+# Test 6: Randomized Testing with Random Cubic Functions
+# -----------------------------
+def random_cubic(x, coeffs):
+    # coeffs: [a0, a1, a2, a3]
+    return coeffs[0] + coeffs[1] * x + coeffs[2] * x ** 2 + coeffs[3] * x ** 3
+
+
+num_tests = 10
+errors = []
+for _ in range(num_tests):
+    # Random coefficients in a reasonable range
+    coeffs = np.random.uniform(-5, 5, 4)
+    f_random = lambda x: random_cubic(x, coeffs)
+
+    # Use Chebyshev nodes for exact interpolation for a cubic
+    nodes_rand = chebyshev_nodes(n, a, b, kind=1)
+    weights_rand = barycentric_weights(nodes_rand)
+    y_rand = f_random(nodes_rand)
+    p_rand = barycentric_interpolation(x_dense, nodes_rand, weights_rand, y_rand)
+    err = np.max(np.abs(f_random(x_dense) - p_rand))
+    errors.append(err)
+
+print("Test 6: Random Cubic Functions - average max error (Barycentric):", np.mean(errors))
