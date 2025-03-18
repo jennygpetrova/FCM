@@ -44,7 +44,7 @@ def barycentric_interpolation(x, nodes, gamma, y_i):
 def newton_divided_diff(x_nodes, y_nodes, fprime=None):
     n = len(x_nodes)
     coeffs = [y_nodes[0]]
-    coeffs_spline = np.zeros(n - 1) if n >= 3 else None
+    coeffs_spline = np.zeros(n - 2) if n >= 3 else None
     y = np.array(y_nodes, dtype=float).copy()
 
     for j in range(1, n):
@@ -53,7 +53,7 @@ def newton_divided_diff(x_nodes, y_nodes, fprime=None):
                 y[i] = fprime(x_nodes[i]) / math.factorial(j)
             else:
                 y[i] = (y[i + 1] - y[i]) / (x_nodes[i + j] - x_nodes[i])
-            if j == 1:
+            if j == 2:
                 coeffs_spline[i] = y[i]
         coeffs.append(y[0])
 
@@ -128,20 +128,28 @@ def piecewise_polynomial(f, a, b, num_sub, x, degree, global_method, local_metho
 # ------------------------------------------------------------
 # Part 3: Spline Code 2: Cubic B-spline Basis Interpolation
 # ------------------------------------------------------------
-def cubic_spline_coefficients(x_nodes, coeff):
+def cubic_spline_coefficients(x_nodes, coeff, fprime2):
     n = len(x_nodes)
-    matrix = np.zeros((n-1, n))  # Use zeros to initialize the matrix.
-    g = np.zeros(n-1)
-    for i in range(n-2):
+    matrix = np.zeros((n, n))
+    d = np.zeros(n)
+    d[0] = 2 * fprime2(x_nodes[0])
+    d[-1] = 2 * fprime2(x_nodes[-1])
+    matrix[0, 0] = 2
+    matrix[0, 1] = 0
+    matrix[n-1, n-2] = 0
+    matrix[n-1, n-1] = 2
+
+    for i in range(1, n-1):
         h = x_nodes[i] - x_nodes[i - 1]
         h_next = x_nodes[i + 1] - x_nodes[i]
         mu = h / (h + h_next)
         lam = h_next / (h + h_next)
-        matrix[i, i] = mu
-        matrix[i, i + 1] = 2
-        matrix[i, i + 2] = lam
-        g[i] = 3 * ((lam * coeff[i]) + (mu * coeff[i+1]))
-    return matrix, g
+        matrix[i, i - 1] = mu
+        matrix[i, i] = 2
+        matrix[i, i + 1] = lam
+        d[i] = 6 * coeff[i-1]
+
+    return matrix, d
 
 def cubic_spline1_polynomial(x_nodes, y_nodes, x_eval, s):
     n = len(x_nodes)
@@ -171,15 +179,46 @@ def cubic_spline1_polynomial(x_nodes, y_nodes, x_eval, s):
     return p
 
 
+def cubic_spline2_polynomial(x_nodes, t):
+    if len(x_nodes) != 5:
+        print('!!! Cubic B-Spline ERROR: x_nodes must have length 5 !!!')
+    B = np.zeros_like(t)
+    h = x_nodes[2] - x_nodes[1]
+    for j in range(len(t)):
+        if x_nodes[0] <= t[j] <= x_nodes[-1]:
+            index = np.searchsorted(x_nodes, t[j]) - 1
+            k = index
+            sum = 0.0
+            for i in range(5 - k - 1):
+                binom = math.comb(4, i)
+                sign = (-1) ** i
+                term = np.maximum(0, (x_nodes[-i-1] - t[j]) ** 3)
+                sum += sign * binom * term
+            B[j] = sum / (h**3)
+        else:
+            B[j] = 0
+    return B
+
+
+# Example usage:
+if __name__ == '__main__':
+    # Example nodes and evaluation points:
+    x_nodes = np.array([1, 3, 5, 7, 9])
+    t = [0, 2.5, 6, 10]
+    B_vals = cubic_spline2_polynomial(x_nodes, t)
+    print("B(t) =", B_vals)
 
 # ------------------------------------------------------------
 # Testing Functions
 # ------------------------------------------------------------
 def f(x):
-    return x ** 3
+    return 1 / (x ** 3)
 
 def fprime(x):
-    return 3 * x ** 2
+    return (-3) / (x ** 4)
+
+def fprime2(x):
+    return 12 / (x ** 5)
 
 x_eval = (2, 4, 6)
 x_nodes = np.array([1, 3, 5, 7, 8])
@@ -201,39 +240,44 @@ g = piecewise_polynomial(f, 0, 5, 5, x_nodes, 3, 0, 2, hermite=True, fprime=fpri
 print("Piecewise Polynomial Evaluation:", g)
 
 # Testing the cubic spline coefficient matrix
-matrix, g = cubic_spline_coefficients(x_nodes, coeff_spline)
+matrix, d = cubic_spline_coefficients(x_nodes, coeff_spline, fprime2)
 print("Cubic Spline Coefficient Matrix:")
 print(matrix)
+print("Cubic Spline Coefficients:")
+print(d)
 
 matrix_inv = np.linalg.inv(matrix)
-s = np.dot(matrix_inv, g)
+s = np.dot(matrix_inv, d)
 print("s''(x): ", s)
 
 p2 = cubic_spline1_polynomial(x_nodes, y_nodes, x_eval, s)
 print("Cubic Spline Polynomial Evaluation:", p2)
 
-# Example usage:
-if __name__ == '__main__':
-    x_nodes = np.linspace(-5, 5, 11)
-    y_nodes = f(x_nodes)
-
-    # Here, we assume that you have computed the interior second derivatives s_int
-    # from the spline system (for natural boundary conditions). For illustration,
-    # we use a dummy array (e.g., zeros) for the interior s. In practice, you should
-    # replace this with your computed values.
-    s_interior = [0] * (len(x_nodes) - 2)  # Replace with your computed interior s values.
-
-    # Create a dense set of evaluation points.
-    x_eval = np.linspace(x_nodes[0], x_nodes[-1], 500)
-    spline_values = cubic_spline1_polynomial(x_nodes, y_nodes, x_eval, s_interior)
-
-    # Plot the results.
-    plt.figure(figsize=(10, 6))
-    plt.plot(x_eval, f(x_eval), 'k-', label='f(x)')
-    plt.plot(x_eval, spline_values, 'r--', label='Cubic Spline')
-    plt.plot(x_nodes, y_nodes, 'ko', label='Nodes')
-    plt.xlabel('x')
-    plt.ylabel('y')
-    plt.title('Cubic Spline Interpolation (Natural BC)')
-    plt.legend()
-    plt.show()
+p3 = piecewise_polynomial(f, 0, 5, 5, x_eval, 3, 0, 2, hermite=False, fprime=fprime2)
+print("Piecewise Polynomial Evaluation:", p3)
+#
+# # Example usage:
+# if __name__ == '__main__':
+#     x_nodes = np.linspace(-5, 5, 11)
+#     y_nodes = f(x_nodes)
+#
+#     # Here, we assume that you have computed the interior second derivatives s_int
+#     # from the spline system (for natural boundary conditions). For illustration,
+#     # we use a dummy array (e.g., zeros) for the interior s. In practice, you should
+#     # replace this with your computed values.
+#     s_interior = [0] * (len(x_nodes) - 2)  # Replace with your computed interior s values.
+#
+#     # Create a dense set of evaluation points.
+#     x_eval = np.linspace(x_nodes[0], x_nodes[-1], 500)
+#     spline_values = cubic_spline1_polynomial(x_nodes, y_nodes, x_eval, s_interior)
+#
+#     # Plot the results.
+#     plt.figure(figsize=(10, 6))
+#     plt.plot(x_eval, f(x_eval), 'k-', label='f(x)')
+#     plt.plot(x_eval, spline_values, 'r--', label='Cubic Spline')
+#     plt.plot(x_nodes, y_nodes, 'ko', label='Nodes')
+#     plt.xlabel('x')
+#     plt.ylabel('y')
+#     plt.title('Cubic Spline Interpolation (Natural BC)')
+#     plt.legend()
+#    plt.show()
