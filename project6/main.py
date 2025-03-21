@@ -342,31 +342,67 @@ def cubic_b_spline_interpolation(x_nodes, f, fprime):
 # -----------------------------
 # Test 1: Barycentric Interpolation on a Cubic Polynomial
 # -----------------------------
-def g_cubic(x):
-    return np.sin(x)
+# def f(x):
+#     return 1 / (1 + (10 * x ** 2))
+#
+# def fprime(x):
+#     return - (20 * x) / ((1 + (10 * x ** 2)) ** 2)
+#
+# def fprime2(x):
+#     return - (20 * (1 - 30 * x ** 2)) / ((1 + (10 * x ** 2)) ** 3)
 
-def g_quadratic(x):
-    return np.cos(x)
+# def f(x):
+#     return np.sin(x)
+#
+# def fprime(x):
+#     return np.cos(x)
+#
+# def fprime2(x):
+#     return - np.sin(x)
 
-def g_linear(x):
-    return -1 * np.sin(x)
+def f(x):
+    return x ** 3
 
-a, b = -  np.pi / 2, np.pi / 2
-n = 3
-nodes = chebyshev_nodes(n, a, b, kind=2)
-weights = barycentric_weights(nodes)
-y_nodes = g_cubic(nodes)
+def fprime(x):
+    return 3 * x ** 2
 
+def fprime2(x):
+    return 6 * x
+
+a, b = - 1, 1
+# n0 = 5
+# n1 = 10
+# n2 = 20
+# nodes = chebyshev_nodes(n0, a, b, kind=2)
+# nodes1 = chebyshev_nodes(n1, a, b, kind=2)
+# nodes2 = chebyshev_nodes(n2, a, b, kind=2)
+# weights = barycentric_weights(nodes)
+# weights1 = barycentric_weights(nodes1)
+# weights2 = barycentric_weights(nodes2)
+# y_nodes = f(nodes)
+# y_nodes1 = f(nodes1)
+# y_nodes2 = f(nodes2)
+#
 x_dense = np.linspace(a, b, 100)
 # p_bary = barycentric_interpolation(x_dense, nodes, weights, y_nodes)
-# error_bary = np.max(np.abs(g_cubic(x_dense) - p_bary))
+# p_bary1 = barycentric_interpolation(x_dense, nodes1, weights1, y_nodes1)
+# p_bary2 = barycentric_interpolation(x_dense, nodes2, weights2, y_nodes2)
+# error_bary = round(np.max(np.abs(f(x_dense) - p_bary)),8)
+# error_bary1 = round(np.max(np.abs(f(x_dense) - p_bary1)),8)
+# error_bary2 = round(np.max(np.abs(f(x_dense) - p_bary2)),8)
 # print("Test 1: Barycentric Interpolation max error (cubic):", error_bary)
+# print("Test 2: Barycentric Interpolation max error (cubic):", error_bary1)
+# print("Test 3: Barycentric Interpolation max error (cubic):", error_bary2)
 #
 # plt.figure()
-# plt.plot(x_dense, g_cubic(x_dense), 'k-', label="g(x) exact")
-# plt.plot(x_dense, p_bary, 'r--', label="Barycentric interp.")
-# plt.scatter(nodes, y_nodes, c='blue', zorder=5, label="Nodes")
-# plt.title("Barycentric Interpolation on Cubic Function")
+# plt.plot(x_dense, f(x_dense), 'k-', label="f(x) exact")
+# plt.plot(x_dense, p_bary, 'r--', label="Barycentric, n=5")
+# plt.plot(x_dense, p_bary1, 'b--', label="Barycentric, n=10")
+# plt.plot(x_dense, p_bary2, 'c--', label="Barycentric, n=20")
+# plt.scatter(nodes2, y_nodes2, c='c', zorder=5, label="Nodes, n=20")
+# plt.scatter(nodes1, y_nodes1, c='b', zorder=5, label="Nodes, n=10")
+# plt.scatter(nodes, y_nodes, c='r', zorder=5, label="Nodes, n=5")
+# plt.title("Barycentric Interpolation")
 # plt.legend()
 # plt.savefig("barycentric_interpolation1.png")
 # plt.show()
@@ -374,121 +410,102 @@ x_dense = np.linspace(a, b, 100)
 # -----------------------------
 # Test 2: Piecewise Polynomial Interpolation on a Cubic Function
 # -----------------------------
-num_sub = 10
-p_piecewise = piecewise_polynomial(g_cubic, a, b, num_sub, x_dense, degree=3, local_method=2)
-error_piecewise = np.max(np.abs(g_cubic(x_dense) - p_piecewise))
-print("Test 2: Piecewise Polynomial Interpolation max error (cubic):", error_piecewise)
-
-plt.figure()
-plt.plot(x_dense, g_cubic(x_dense), 'k-', label="g(x) exact")
-plt.plot(x_dense, p_piecewise, 'g--', label="Piecewise poly interp.")
-plt.title("Piecewise Polynomial Interpolation on Cubic Function")
-plt.legend()
-plt.savefig("piecewise1_pi_10.png")
-plt.show()
+# num_sub = 20
+# p_piecewise = piecewise_polynomial(f, a, b, num_sub, x_dense, degree=3, local_method=2)
+# error_piecewise = round(np.max(np.abs(f(x_dense) - p_piecewise)),8)
+# print("Test 2: Piecewise Polynomial Interpolation max error (cubic):", error_piecewise)
 #
-# # -----------------------------
-# # Test 3: Piecewise Hermite Polynomial Interpolation on a Cubic Function
-# # -----------------------------
-p_piecewise2 = piecewise_polynomial(g_cubic, a, b, num_sub, x_dense, degree=3, local_method=2,
-                                    hermite=True, fprime=g_quadratic)
-error_piecewise2 = np.max(np.abs(g_cubic(x_dense) - p_piecewise2))
-print("Test 3: Piecewise Hermite Polynomial Interpolation max error (cubic):", error_piecewise2)
-
-plt.figure()
-plt.plot(x_dense, g_cubic(x_dense), 'k-', label="g(x) exact")
-plt.plot(x_dense, p_piecewise2, 'g--', label="Piecewise poly interp.")
-plt.title("Piecewise Hermite Polynomial Interpolation on Cubic Function")
-plt.legend()
-plt.savefig("piecewise1_hermite_pi_10.png")
-plt.show()
+# plt.figure()
+# plt.plot(x_dense, f(x_dense), 'k-', label="f(x) exact")
+# plt.plot(x_dense, p_piecewise, 'g--', label="Piecewise poly interp.")
+# plt.title("Piecewise Polynomial Interpolation")
+# plt.legend()
+# plt.savefig("piecewise_10_20.png")
+# plt.show()
+#
+# # # -----------------------------
+# # # Test 3: Piecewise Hermite Polynomial Interpolation on a Cubic Function
+# # # -----------------------------
+# p_piecewise2 = piecewise_polynomial(f, a, b, num_sub, x_dense, degree=3, local_method=2,
+#                                     hermite=True, fprime=fprime)
+# error_piecewise2 = round(np.max(np.abs(f(x_dense) - p_piecewise2)),8)
+# print("Test 3: Piecewise Hermite Polynomial Interpolation max error (cubic):", error_piecewise2)
+#
+# plt.figure()
+# plt.plot(x_dense, f(x_dense), 'k-', label="f(x) exact")
+# plt.plot(x_dense, p_piecewise2, 'g--', label="Piecewise poly interp.")
+# plt.title("Piecewise Hermite Polynomial Interpolation")
+# plt.legend()
+# plt.savefig("piecewise_hermite_10_20.png")
+# plt.show()
 #
 #
 # # -----------------------------
 # # Test 4: Cubic Spline Interpolation (Spline Code 1) on a Cubic Function
 # # -----------------------------
-# x_nodes = np.linspace(a, b, 4)
-# y_nodes = g_cubic(x_nodes)
-# _, coeffs = newton_divided_diff(x_nodes, y_nodes)
-# matrix, d = cubic_spline_coefficients(x_nodes, coeffs, g_linear)
-# s = np.linalg.solve(matrix, d)
-# spline1 = cubic_spline_polynomial(x_nodes, y_nodes, x_dense, s)
-# error_spline1 = np.max(np.abs(g_cubic(x_dense) - spline1))
-# print("Test 4: Cubic Spline max error:", error_spline1)
 #
-# plt.figure()
-# plt.plot(x_dense, g_cubic(x_dense), 'k-', label="g(x) exact")
-# plt.plot(x_dense, spline1, 'm--', label="Cubic Spline Code 1")
-# plt.title("Cubic Spline on Cubic Function")
-# plt.legend()
-# plt.savefig("cubic_spline_10.png")
-# plt.show()
+splines = []
+for n in (10, 50, 80):
+    x_nodes = np.linspace(a, b, n)
+    y_nodes = f(x_nodes)
+    _, coeffs = newton_divided_diff(x_nodes, y_nodes)
+    matrix, d = cubic_spline_coefficients(x_nodes, coeffs, fprime2)
+    s = np.linalg.solve(matrix, d)
+    spline1 = cubic_spline_polynomial(x_nodes, y_nodes, x_dense, s)
+    splines.append(spline1)
+    error_spline1 = round(np.max(np.abs(f(x_dense) - spline1)),8)
+    print(f"Test 4: Cubic Spline max error for n={n}:", error_spline1)
+
+plt.figure()
+plt.plot(x_dense, f(x_dense), 'k-', label="f(x) exact")
+plt.plot(x_dense, splines[0], 'c--', label="Cubic Spline n=10")
+plt.plot(x_dense, splines[1], 'b--', label="Cubic Spline n=50")
+plt.plot(x_dense, splines[2], 'r--', label="Cubic Spline n=80")
+plt.title("Cubic Spline Interpolation")
+plt.legend()
+plt.savefig("cubic_spline_1.png")
+plt.show()
 
 # # -----------------------------
 # # Test 5: Cubic Spline Interpolation (Spline Code 2) on a Cubic Function
 # # -----------------------------
 
-# num_nodes = 5
-# x_nodes = np.linspace(a, b, num_nodes)
-# y_nodes = g_cubic(x_nodes)
+splines1 = []
+for n in (10, 50, 80):
+    num_nodes = n
+    x_nodes = np.linspace(a, b, num_nodes)
+    y_nodes = f(x_nodes)
+
+    s_vals, alpha = cubic_b_spline_interpolation(x_nodes, f, fprime)
+    x_dense = np.linspace(a, b, 100)
+    s_dense = np.zeros_like(x_dense)
+    h = x_nodes[1] - x_nodes[0]
+    x0 = x_nodes[0]
+    N = len(alpha)  # = n+3
+    for idx, x in enumerate(x_dense):
+        s_val = 0.0
+        for j in range(N):
+            i_index = j - 1
+            s_val += alpha[j] * cubic_Bspline_coefficients(i_index, x, x0, h)
+        s_dense[idx] = s_val
+    splines1.append(s_dense)
+
+    error_spline2 = np.max(np.abs(f(x_dense) - s_dense))
+    print(f"Test 5: Cubic B-Spline max error for n={n}:", error_spline2)
 #
-# s_vals, alpha = cubic_b_spline_interpolation(x_nodes, g_cubic, g_quadratic)
-# x_dense = np.linspace(a, b, 100)
-# s_dense = np.zeros_like(x_dense)
-# h = x_nodes[1] - x_nodes[0]
-# x0 = x_nodes[0]
-# N = len(alpha)  # = n+3
-# for idx, x in enumerate(x_dense):
-#     s_val = 0.0
-#     for j in range(N):
-#         i_index = j - 1
-#         s_val += alpha[j] * cubic_Bspline_coefficients(i_index, x, x0, h)
-#     s_dense[idx] = s_val
 #
-# error_spline2 = np.max(np.abs(g_cubic(x_dense) - s_dense))
-# print("Test 5: Cubic B-Spline max error:", error_spline2)
-#
-#
-# plt.plot(x_dense, g_cubic(x_dense), 'k-', label="f(x) = x^3 (exact)")
-# plt.plot(x_dense, s_dense, 'r--', label="Cubic B-spline Interpolant")
-# plt.plot(x_nodes, y_nodes, 'bo', label="Nodes")
-# plt.title("Cubic B-spline Interpolation via B-spline Basis")
-# plt.xlabel("x")
-# plt.ylabel("y")
-# plt.legend()
-# plt.savefig("cubic_Bspline_1.png")
-# plt.show()
+plt.plot(x_dense, f(x_dense), 'k-', label="f(x) (exact)")
+plt.plot(x_dense, splines1[0], 'c--', label="Cubic B-spline n=10")
+plt.plot(x_dense, splines1[1], 'b--', label="Cubic B-spline n=50")
+plt.plot(x_dense, splines1[2], 'r--', label="Cubic B-spline n=80")
+plt.title("Cubic B-spline Interpolation via B-spline Basis")
+plt.xlabel("x")
+plt.ylabel("y")
+plt.legend()
+plt.savefig("cubic_Bspline_1.png")
+plt.show()
 
 
-# # -----------------------------
-# # Test 6: Comparison on a Non-Polynomial Function (e.g., sin(x))
-# # -----------------------------
-# def f_sin(x):
-#     return np.sin(x)
-
-# a_sin, b_sin = 0, np.pi
-# x_dense_sin = np.linspace(a_sin, b_sin, 200)
-# n_sin = 10  # number of nodes for barycentric
-# nodes_sin = chebyshev_nodes(n_sin, a_sin, b_sin, kind=1)
-# weights_sin = barycentric_weights(nodes_sin)
-# y_nodes_sin = f_sin(nodes_sin)
-# p_bary_sin = barycentric_interpolation(x_dense_sin, nodes_sin, weights_sin, y_nodes_sin)
-# p_piecewise_sin = piecewise_polynomial(f_sin, a_sin, b_sin, num_sub=4, x=x_dense_sin, degree=3, local_method=1)
-#
-# plt.figure()
-# plt.plot(x_dense_sin, f_sin(x_dense_sin), 'k-', label="sin(x) exact")
-# plt.plot(x_dense_sin, p_bary_sin, 'r--', label="Barycentric")
-# plt.plot(x_dense_sin, p_piecewise_sin, 'g--', label="Piecewise Poly")
-# plt.title("Comparison on sin(x)")
-# plt.legend()
-# plt.show()
-#
-# error_bary_sin = np.max(np.abs(f_sin(x_dense_sin) - p_bary_sin))
-# error_piecewise_sin = np.max(np.abs(f_sin(x_dense_sin) - p_piecewise_sin))
-# print("Test 5: sin(x) Barycentric max error:", error_bary_sin)
-# print("Test 5: sin(x) Piecewise Poly max error:", error_piecewise_sin)
-#
-#
 # # -----------------------------
 # # Test 6: Randomized Testing with Random Cubic Functions
 # # -----------------------------
