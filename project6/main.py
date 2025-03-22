@@ -1,10 +1,12 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import math
+from scipy.interpolate import CubicSpline
 
-# ------------------------------------------------------------
-# Part 1: Barycentric Interpolating Polynomial (pn)
-# ------------------------------------------------------------
+
+"-------------------------------------------------------"
+"PART 1: BARYCENTRIC INTERPOLATING POLYNOMIAL"
+"-------------------------------------------------------"
 def chebyshev_nodes(n, a, b, kind):
     if kind == 1:
         k = np.arange(n + 1)
@@ -15,19 +17,23 @@ def chebyshev_nodes(n, a, b, kind):
     nodes = (a + b) / 2 + (b - a) / 2 * mesh
     return nodes
 
+
 def barycentric_weights(nodes):
     n = len(nodes)
     gamma = np.ones(n)
+
     for j in range(n):
         for i in range(n):
             if i != j:
                 gamma[j] /= (nodes[j] - nodes[i])
     return gamma
 
+
 def barycentric_interpolation(x, nodes, gamma, y_i):
     n = len(nodes)
     p = np.zeros_like(x)
     w = np.ones_like(x)
+
     for k in range(len(x)):
         for j in range(n):
             w[k] *= (x[k] - nodes[j])
@@ -38,13 +44,13 @@ def barycentric_interpolation(x, nodes, gamma, y_i):
             p[k] += (w[k] * y_i[i] * gamma[i]) / (x[k] - nodes[i])
     return p
 
-# ------------------------------------------------------------
-# Part 2: Piecewise Interpolating Polynomial (gd)
-# ------------------------------------------------------------
+
+"-------------------------------------------------------"
+"PART 2: PIECEWISE INTERPOLATING POLYNOMIAL"
+"-------------------------------------------------------"
 def newton_divided_diff(x_nodes, y_nodes, fprime=None):
     n = len(x_nodes)
     coeffs = [y_nodes[0]]
-    coeffs_spline = np.zeros(n - 2) if n >= 3 else None
     y = np.array(y_nodes, dtype=float).copy()
 
     for j in range(1, n):
@@ -53,12 +59,11 @@ def newton_divided_diff(x_nodes, y_nodes, fprime=None):
                 y[i] = fprime(x_nodes[i]) / math.factorial(j)
             else:
                 y[i] = (y[i + 1] - y[i]) / (x_nodes[i + j] - x_nodes[i])
-            if j == 2:
-                coeffs_spline[i] = y[i]
         coeffs.append(y[0])
 
     coeff = np.array(coeffs)
-    return coeff, coeffs_spline
+    return coeff
+
 
 def newton_polynomial(x, x_nodes, coeff):
     n = len(coeff)
@@ -66,6 +71,7 @@ def newton_polynomial(x, x_nodes, coeff):
     for i in range(n - 2, -1, -1):
         p = p * (x - x_nodes[i]) + coeff[i]
     return p
+
 
 def piecewise_polynomial(f, a, b, num_sub, x, degree, local_method, hermite=False, fprime=None):
     # Create global mesh points
@@ -79,9 +85,7 @@ def piecewise_polynomial(f, a, b, num_sub, x, degree, local_method, hermite=Fals
         if hermite:
             x_nodes = [ai, ai, bi, bi]
             y_nodes = [f(ai), f(ai), f(bi), f(bi)]
-            # Unpack the tuple: use only the Newton coefficients.
-            newton_coeff, _ = newton_divided_diff(x_nodes, y_nodes, fprime=fprime)
-            coeff = newton_coeff
+            coeff = newton_divided_diff(x_nodes, y_nodes, fprime=fprime)
         else:
             if degree == 1:
                 x_nodes = [ai, bi]
@@ -99,8 +103,7 @@ def piecewise_polynomial(f, a, b, num_sub, x, degree, local_method, hermite=Fals
                 else:
                     x_nodes = chebyshev_nodes(3, ai, bi, local_method)
             y_nodes = [f(xi) for xi in x_nodes]
-            newton_coeff, _ = newton_divided_diff(x_nodes, y_nodes)
-            coeff = newton_coeff
+            coeff = newton_divided_diff(x_nodes, y_nodes)
 
         sub_data.append({
             'ai': ai,
@@ -123,410 +126,471 @@ def piecewise_polynomial(f, a, b, num_sub, x, degree, local_method, hermite=Fals
     return g
 
 
-# ------------------------------------------------------------
-# Part 3: Spline Code 2: Cubic B-spline Basis Interpolation
-# ------------------------------------------------------------
-def cubic_spline_coefficients(x_nodes, coeff, fprime2):
-    n = len(x_nodes)
-    matrix = np.zeros((n, n))
+"-------------------------------------------------------"
+"PART 3: SPLINE INTERPOLATING POLYNOMIAL"
+"-------------------------------------------------------"
+def cubic_spline_coefficients(t_nodes, y_nodes):
+    n = len(t_nodes)
+    a = np.zeros(n)
+    h = np.diff(t_nodes)
+    lam = np.ones(n)
+    mu = np.zeros(n)
     d = np.zeros(n)
-    d[0] = 2 * fprime2(x_nodes[0])
-    d[-1] = 2 * fprime2(x_nodes[-1])
-    matrix[0, 0] = 2
-    matrix[0, 1] = 0
-    matrix[n-1, n-2] = 0
-    matrix[n-1, n-1] = 2
 
-    for i in range(1, n-1):
-        h = x_nodes[i] - x_nodes[i - 1]
-        h_next = x_nodes[i + 1] - x_nodes[i]
-        mu = h / (h + h_next)
-        lam = h_next / (h + h_next)
-        matrix[i, i - 1] = mu
-        matrix[i, i] = 2
-        matrix[i, i + 1] = lam
-        d[i] = 6 * coeff[i-1]
+    for i in range(1, n - 1):
+        a[i] = (3 / h[i]) * (y_nodes[i + 1] - y_nodes[i]) - (3 / h[i - 1]) * (y_nodes[i] - y_nodes[i - 1])
 
-    return matrix, d
+    for i in range(1, n - 1):
+        lam[i] = 2 * (t_nodes[i + 1] - t_nodes[i - 1]) - h[i - 1] * mu[i - 1]
+        mu[i] = h[i] / lam[i]
+        d[i] = (a[i] - h[i - 1] * d[i - 1]) / lam[i]
 
-def cubic_spline_polynomial(x_nodes, y_nodes, x_eval, s):
-    n = len(x_nodes)
-    m = len(x_eval)
-
-    s = list(s)
-    s.insert(0, 0)
-    s.append(0)
-    p = np.zeros(m)
-
-    for j in range(m):
-        x = x_eval[j]
-        if x <= x_nodes[0]:
-            i = 1
-        elif x >= x_nodes[-1]:
-            i = n - 1
-        else:
-            for i in range(1, n):
-                if x <= x_nodes[i]:
-                    break
-        h = x_nodes[i] - x_nodes[i - 1]
-        A = (x_nodes[i] - x) / h
-        B = (x - x_nodes[i - 1]) / h
-
-        p[j] = (A * y_nodes[i - 1] + B * y_nodes[i] +
-                ((A ** 3 - A) * s[i - 1] + (B ** 3 - B) * s[i]) * (h ** 2) / 6)
-    return p
-
-def cubic_Bspline_coefficients(i, x, x0, h):
-    A = x0 + (i - 2) * h
-    B = x0 + (i - 1) * h
-    C = x0 + i * h
-    D = x0 + (i + 1) * h
-    E = x0 + (i + 2) * h
-
-    if x < A or x > E:
-        return 0.0
-    if A <= x < B:
-        return ((x - A) ** 3) / (h ** 3)
-    if B <= x < C:
-        return (h ** 3 + 3 * h ** 2 * (x - B) + 3 * h * (x - B) ** 2 - 3 * (x - B) ** 3) / (h ** 3)
-    if C <= x < D:
-        return (h ** 3 + 3 * h ** 2 * (D - x) + 3 * h * (D - x) ** 2 - 3 * (D - x) ** 3) / (h ** 3)
-    if D <= x <= E:
-        return ((E - x) ** 3) / (h ** 3)
-    return 0.0
+    M = np.zeros(n)  # M = s''
+    for j in range(n - 2, 0, -1):
+        M[j] = d[j] - mu[j] * M[j + 1]
+    return M
 
 
-def cubic_b_spline_interpolation(x_nodes, f, fprime):
+def cubic_spline_polynomial(t_nodes, y_data, M, x):
+    n = len(t_nodes)
+
+    if x <= t_nodes[0]:
+        i = 0
+    elif x >= t_nodes[-1]:
+        i = n - 2
+    else:
+        i = np.searchsorted(t_nodes, x) - 1
+
+    h = t_nodes[i + 1] - t_nodes[i]
+    A = (t_nodes[i + 1] - x) / h
+    B = (x - t_nodes[i]) / h
+    y_val = (A * y_data[i] + B * y_data[i + 1] +
+             ((A ** 3 - A) * M[i] + (B ** 3 - B) * M[i + 1]) * (h ** 2) / 6)
+    return y_val
+
+
+def cubic_spline_prime(t_nodes, y_nodes, M, x):
+    n = len(t_nodes)
+
+    if x <= t_nodes[0]:
+        i = 0
+    elif x >= t_nodes[-1]:
+        i = n - 2
+    else:
+        i = np.searchsorted(t_nodes, x) - 1
+
+    h = t_nodes[i + 1] - t_nodes[i]
+    A = (t_nodes[i + 1] - x) / h
+    B = (x - t_nodes[i]) / h
+    term1 = (y_nodes[i + 1] - y_nodes[i]) / h
+    term2 = -((3 * A ** 2 - 1) * M[i] * h) / 6.0
+    term3 = ((3 * B ** 2 - 1) * M[i + 1] * h) / 6.0
+    sum = term1 + term2 + term3
+    return sum
+
+
+def cubic_bspline_coefficients(i, x, xi, h):
+    x = float(x)
+    x0 = xi + (i - 2) * h
+    x1 = xi + (i - 1) * h
+    x2 = xi + i * h
+    x3 = xi + (i + 1) * h
+    x4 = xi + (i + 2) * h
+
+    B = 0.0
+    if x < x0 or x > x4:
+        return B
+    if x0 <= x < x1:
+        B = ((x - x0) ** 3) / (h ** 3)
+        return B
+    if x1 <= x < x2:
+        B = (h ** 3 + 3 * h ** 2 * (x - x1) + 3 * h * (x - x1) ** 2 - 3 * (x - x1) ** 3) / (h ** 3)
+        return B
+    if x2 <= x < x3:
+        B = (h ** 3 + 3 * h ** 2 * (x3 - x) + 3 * h * (x3 - x) ** 2 - 3 * (x3 - x) ** 3) / (h ** 3)
+        return B
+    if x3 <= x <= x4:
+        B = ((x4 - x) ** 3) / (h ** 3)
+        return B
+    return B
+
+
+def cubic_bspline_interpolation(x_nodes, f, fprime):
     n = len(x_nodes) - 1
-    h = x_nodes[1] - x_nodes[0]  # uniform spacing (assumed)
-    x0 = x_nodes[0]  # starting point (for extended mesh)
-
-    # The system has n+3 unknowns: indices from -1 to n+1.
+    h = x_nodes[1] - x_nodes[0]  # assuming uniform spacing
     N = n + 3
-    M = np.zeros((N, N))
-    b = np.zeros(N)
+    matrix = np.zeros((N, N))
+    B = np.zeros(N)
 
-    # Row 0: derivative condition at x0: s'(x0) = fprime(x0).
-    # For the cardinal cubic B-splines, the only nonzero derivatives at x0 are:
-    # B_{-1}'(x0) = -3/h, B_{1}'(x0) = 3/h.
-    # In our index shift, α_0 corresponds to α_{-1}, α_1 corresponds to α_0, α_2 corresponds to α_1, etc.
-    M[0, 0] = -3.0 / h
-    M[0, 2] = 3.0 / h
-    b[0] = fprime(x_nodes[0])
+    matrix[0, 0] = -3.0 / h
+    matrix[0, 2] = 3.0 / h
+    matrix[1, 0] = 1.0
+    matrix[1, 1] = 4.0
+    matrix[1, 2] = 1.0
+    matrix[n + 1, n] = -3.0 / h
+    matrix[n + 1, n + 2] = 3.0 / h
+    matrix[n + 2, n] = 1.0
+    matrix[n + 2, n + 1] = 4.0
+    matrix[n + 2, n + 2] = 1.0
 
-    # Row 1: interpolation at x0: s(x0) = f(x0)
-    # Only B_{-1}(x0), B_0(x0) and B_1(x0) are nonzero.
-    # The slides state that the values are: [1, 4, 1]
-    M[1, 0] = 1.0
-    M[1, 1] = 4.0
-    M[1, 2] = 1.0
-    b[1] = f(x_nodes[0])
+    B[0] = fprime(x_nodes[0])
+    B[1] = f(x_nodes[0])
+    B[n + 1] = fprime(x_nodes[-1])
+    B[n + 2] = f(x_nodes[-1])
 
-    # Interior rows: for i = 1,..., n-1 (nodes x_1 to x_{n-1})
-    # They occupy rows 2 to n.
     for i in range(1, n):
         row = i + 1
-        # Nonzero entries: correspond to B_{i-1}, B_{i}, B_{i+1}.
-        M[row, i] = 1.0
-        M[row, i + 1] = 4.0
-        M[row, i + 2] = 1.0
-        b[row] = f(x_nodes[i])
+        matrix[row, i] = 1.0
+        matrix[row, i + 1] = 4.0
+        matrix[row, i + 2] = 1.0
+        B[row] = f(x_nodes[i])
 
-    # Row n+1: derivative condition at x_n: s'(x_n) = fprime(x_n)
-    # Nonzero: B_{n-1}'(x_n) = -3/h, B_{n+1}'(x_n) = 3/h.
-    M[n + 1, n] = -3.0 / h
-    M[n + 1, n + 2] = 3.0 / h
-    b[n + 1] = fprime(x_nodes[-1])
-
-    # Row n+2: interpolation at x_n: s(x_n) = f(x_n)
-    # Nonzero: corresponding to B_{n-1}, B_n, B_{n+1}: [1, 4, 1]
-    M[n + 2, n] = 1.0
-    M[n + 2, n + 1] = 4.0
-    M[n + 2, n + 2] = 1.0
-    b[n + 2] = f(x_nodes[-1])
-
-    # Solve the linear system M * alpha = b.
-    alpha = np.linalg.solve(M, b)
-    # Note: alpha[0] corresponds to α_{-1}, alpha[1] to α_0, ..., alpha[N-1] to α_{n+1}.
-
-    # Now, evaluate the spline at each node x_i:
-    s_vals = np.zeros(len(x_nodes))
-    for idx, x in enumerate(x_nodes):
-        # Since each B-spline B_i(x) (for i = -1 to n+1) has support over [x0+(i-2)h, x0+(i+2)h],
-        # we sum over i = -1 to n+1.
-        s_val = 0.0
-        for j in range(N):
-            # Our jth coefficient corresponds to index i = j - 1.
-            i_index = j - 1
-            s_val += alpha[j] * cubic_Bspline_coefficients(i_index, x, x0, h)
-        s_vals[idx] = s_val
-    return s_vals, alpha
+    alpha = np.linalg.solve(matrix, B)
+    return alpha
 
 
-"SAMPLE TESTING OF ROUTINE FUNCTIONALITY"
-# ------------------------------------------------------------
-# Testing Functions
-# ------------------------------------------------------------
-# def f(x):
-#     return (x ** 3) + (2 * x ** 2)
-#
-# def fprime(x):
-#     return (3 * x ** 2) + (4 * x)
-#
-# def fprime2(x):
-#     return (6 * x) + 4
-#
-# x_eval = (2, 4, 6)
-# x_nodes = np.array([1, 3, 5, 7, 8])
-# print("x_nodes:", x_nodes)
-# y_nodes = f(x_nodes)
-# print("y_nodes:", y_nodes)
-#
-# # Testing Newton divided differences with derivative (for Hermite)
-# coeff, coeff_spline = newton_divided_diff(x_nodes, y_nodes, fprime=fprime)
-# print("Newton Coefficients:", coeff)
-# print("Second Order Divided Differences:", coeff_spline)
-#
-# # Evaluate the Newton polynomial (using full nodes as x_nodes here for a simple test)
-# p = newton_polynomial(x_nodes, x_nodes, coeff)
-# print("Newton Polynomial Evaluation:", p)
-#
-# # Testing piecewise polynomial with Hermite interpolation
-# g = piecewise_polynomial(f, 0, 5, 5, x_eval, 3, 0, 2, hermite=True, fprime=fprime)
-# print("Piecewise Polynomial Evaluation:", g)
-#
-# # Testing the cubic spline coefficient matrix
-# matrix, d = cubic_spline_coefficients(x_eval, coeff_spline, fprime2)
-# print("Cubic Spline Coefficient Matrix:")
-# print(matrix)
-# print("Cubic Spline Coefficients:")
-# print(d)
-#
-# matrix_inv = np.linalg.inv(matrix)
-# s = np.dot(matrix_inv, d)
-# print("s''(x): ", s)
-#
-# p2 = cubic_spline_polynomial(x_nodes, y_nodes, x_eval, s)
-# print("Cubic Spline Polynomial Evaluation:", p2)
-#
-# p3 = piecewise_polynomial(f, 0, 5, 5, x_eval, 3, 0, 2, hermite=False, fprime=fprime2)
-# print("Piecewise Polynomial Evaluation:", p3)
-#
-# if __name__ == '__main__':
-#     x_nodes = np.linspace(-5, 5, 11)
-#     y_nodes = f(x_nodes)
-#
-#     # Here, we assume that you have computed the interior second derivatives s_int
-#     # from the spline system (for natural boundary conditions). For illustration,
-#     # we use a dummy array (e.g., zeros) for the interior s. In practice, you should
-#     # replace this with your computed values.
-#     s_interior = [0] * (len(x_nodes) - 2)  # Replace with your computed interior s values.
-#
-#     # Create a dense set of evaluation points.
-#     x_eval = np.linspace(x_nodes[0], x_nodes[-1], 500)
-#     spline_values = cubic_spline_polynomial(x_nodes, y_nodes, x_eval, s_interior)
-#
-#     # Plot the results.
-#     plt.figure(figsize=(10, 6))
-#     plt.plot(x_eval, f(x_eval), 'k-', label='f(x)')
-#     plt.plot(x_eval, spline_values, 'r--', label='Cubic Spline')
-#     plt.plot(x_nodes, y_nodes, 'ko', label='Nodes')
-#     plt.xlabel('x')
-#     plt.ylabel('y')
-#     plt.title('Cubic Spline Interpolation (Natural BC)')
-#     plt.legend()
-#     plt.show()
-
-
+"-------------------------------------------------------"
 "TASK 1 TESTING"
-# -----------------------------
-# Test 1: Barycentric Interpolation on a Cubic Polynomial
-# -----------------------------
-# def f(x):
-#     return 1 / (1 + (10 * x ** 2))
-#
-# def fprime(x):
-#     return - (20 * x) / ((1 + (10 * x ** 2)) ** 2)
-#
-# def fprime2(x):
-#     return - (20 * (1 - 30 * x ** 2)) / ((1 + (10 * x ** 2)) ** 3)
+"-------------------------------------------------------"
+if __name__ == '__main__':
 
-# def f(x):
-#     return np.sin(x)
-#
-# def fprime(x):
-#     return np.cos(x)
-#
-# def fprime2(x):
-#     return - np.sin(x)
+    "-------------------------------------------------------"
+    "FUNCTIONS"
+    "-------------------------------------------------------"
+    def f(x):
+        return 1 / (1 + (25 * x ** 2))
 
-def f(x):
-    return x ** 3
+    def fprime(x):
+        return - (20 * x) / ((1 + (10 * x ** 2)) ** 2)
 
-def fprime(x):
-    return 3 * x ** 2
+    def fprime2(x):
+        return - (20 * (1 - 30 * x ** 2)) / ((1 + (10 * x ** 2)) ** 3)
 
-def fprime2(x):
-    return 6 * x
+    # def f(x):
+    #     return np.sin(x)
+    #
+    # def fprime(x):
+    #     return np.cos(x)
+    #
+    # def fprime2(x):
+    #     return - np.sin(x)
+    #
+    # def f(x):
+    #     return x ** 3
+    #
+    # def fprime(x):
+    #     return 3 * x ** 2
+    #
+    # def fprime2(x):
+    #     return 6 * x
 
-a, b = - 1, 1
-# n0 = 5
-# n1 = 10
-# n2 = 20
-# nodes = chebyshev_nodes(n0, a, b, kind=2)
-# nodes1 = chebyshev_nodes(n1, a, b, kind=2)
-# nodes2 = chebyshev_nodes(n2, a, b, kind=2)
-# weights = barycentric_weights(nodes)
-# weights1 = barycentric_weights(nodes1)
-# weights2 = barycentric_weights(nodes2)
-# y_nodes = f(nodes)
-# y_nodes1 = f(nodes1)
-# y_nodes2 = f(nodes2)
-#
-x_dense = np.linspace(a, b, 100)
-# p_bary = barycentric_interpolation(x_dense, nodes, weights, y_nodes)
-# p_bary1 = barycentric_interpolation(x_dense, nodes1, weights1, y_nodes1)
-# p_bary2 = barycentric_interpolation(x_dense, nodes2, weights2, y_nodes2)
-# error_bary = round(np.max(np.abs(f(x_dense) - p_bary)),8)
-# error_bary1 = round(np.max(np.abs(f(x_dense) - p_bary1)),8)
-# error_bary2 = round(np.max(np.abs(f(x_dense) - p_bary2)),8)
-# print("Test 1: Barycentric Interpolation max error (cubic):", error_bary)
-# print("Test 2: Barycentric Interpolation max error (cubic):", error_bary1)
-# print("Test 3: Barycentric Interpolation max error (cubic):", error_bary2)
-#
-# plt.figure()
-# plt.plot(x_dense, f(x_dense), 'k-', label="f(x) exact")
-# plt.plot(x_dense, p_bary, 'r--', label="Barycentric, n=5")
-# plt.plot(x_dense, p_bary1, 'b--', label="Barycentric, n=10")
-# plt.plot(x_dense, p_bary2, 'c--', label="Barycentric, n=20")
-# plt.scatter(nodes2, y_nodes2, c='c', zorder=5, label="Nodes, n=20")
-# plt.scatter(nodes1, y_nodes1, c='b', zorder=5, label="Nodes, n=10")
-# plt.scatter(nodes, y_nodes, c='r', zorder=5, label="Nodes, n=5")
-# plt.title("Barycentric Interpolation")
-# plt.legend()
-# plt.savefig("barycentric_interpolation1.png")
-# plt.show()
-
-# -----------------------------
-# Test 2: Piecewise Polynomial Interpolation on a Cubic Function
-# -----------------------------
-# num_sub = 20
-# p_piecewise = piecewise_polynomial(f, a, b, num_sub, x_dense, degree=3, local_method=2)
-# error_piecewise = round(np.max(np.abs(f(x_dense) - p_piecewise)),8)
-# print("Test 2: Piecewise Polynomial Interpolation max error (cubic):", error_piecewise)
-#
-# plt.figure()
-# plt.plot(x_dense, f(x_dense), 'k-', label="f(x) exact")
-# plt.plot(x_dense, p_piecewise, 'g--', label="Piecewise poly interp.")
-# plt.title("Piecewise Polynomial Interpolation")
-# plt.legend()
-# plt.savefig("piecewise_10_20.png")
-# plt.show()
-#
-# # # -----------------------------
-# # # Test 3: Piecewise Hermite Polynomial Interpolation on a Cubic Function
-# # # -----------------------------
-# p_piecewise2 = piecewise_polynomial(f, a, b, num_sub, x_dense, degree=3, local_method=2,
-#                                     hermite=True, fprime=fprime)
-# error_piecewise2 = round(np.max(np.abs(f(x_dense) - p_piecewise2)),8)
-# print("Test 3: Piecewise Hermite Polynomial Interpolation max error (cubic):", error_piecewise2)
-#
-# plt.figure()
-# plt.plot(x_dense, f(x_dense), 'k-', label="f(x) exact")
-# plt.plot(x_dense, p_piecewise2, 'g--', label="Piecewise poly interp.")
-# plt.title("Piecewise Hermite Polynomial Interpolation")
-# plt.legend()
-# plt.savefig("piecewise_hermite_10_20.png")
-# plt.show()
-#
-#
-# # -----------------------------
-# # Test 4: Cubic Spline Interpolation (Spline Code 1) on a Cubic Function
-# # -----------------------------
-#
-splines = []
-for n in (10, 50, 80):
-    x_nodes = np.linspace(a, b, n)
-    y_nodes = f(x_nodes)
-    _, coeffs = newton_divided_diff(x_nodes, y_nodes)
-    matrix, d = cubic_spline_coefficients(x_nodes, coeffs, fprime2)
-    s = np.linalg.solve(matrix, d)
-    spline1 = cubic_spline_polynomial(x_nodes, y_nodes, x_dense, s)
-    splines.append(spline1)
-    error_spline1 = round(np.max(np.abs(f(x_dense) - spline1)),8)
-    print(f"Test 4: Cubic Spline max error for n={n}:", error_spline1)
-
-plt.figure()
-plt.plot(x_dense, f(x_dense), 'k-', label="f(x) exact")
-plt.plot(x_dense, splines[0], 'c--', label="Cubic Spline n=10")
-plt.plot(x_dense, splines[1], 'b--', label="Cubic Spline n=50")
-plt.plot(x_dense, splines[2], 'r--', label="Cubic Spline n=80")
-plt.title("Cubic Spline Interpolation")
-plt.legend()
-plt.savefig("cubic_spline_1.png")
-plt.show()
-
-# # -----------------------------
-# # Test 5: Cubic Spline Interpolation (Spline Code 2) on a Cubic Function
-# # -----------------------------
-
-splines1 = []
-for n in (10, 50, 80):
-    num_nodes = n
-    x_nodes = np.linspace(a, b, num_nodes)
-    y_nodes = f(x_nodes)
-
-    s_vals, alpha = cubic_b_spline_interpolation(x_nodes, f, fprime)
+    a, b = - 10, 10
     x_dense = np.linspace(a, b, 100)
-    s_dense = np.zeros_like(x_dense)
-    h = x_nodes[1] - x_nodes[0]
-    x0 = x_nodes[0]
-    N = len(alpha)  # = n+3
-    for idx, x in enumerate(x_dense):
-        s_val = 0.0
-        for j in range(N):
-            i_index = j - 1
-            s_val += alpha[j] * cubic_Bspline_coefficients(i_index, x, x0, h)
-        s_dense[idx] = s_val
-    splines1.append(s_dense)
 
-    error_spline2 = np.max(np.abs(f(x_dense) - s_dense))
-    print(f"Test 5: Cubic B-Spline max error for n={n}:", error_spline2)
-#
-#
-plt.plot(x_dense, f(x_dense), 'k-', label="f(x) (exact)")
-plt.plot(x_dense, splines1[0], 'c--', label="Cubic B-spline n=10")
-plt.plot(x_dense, splines1[1], 'b--', label="Cubic B-spline n=50")
-plt.plot(x_dense, splines1[2], 'r--', label="Cubic B-spline n=80")
-plt.title("Cubic B-spline Interpolation via B-spline Basis")
-plt.xlabel("x")
-plt.ylabel("y")
-plt.legend()
-plt.savefig("cubic_Bspline_1.png")
-plt.show()
+    "-------------------------------------------------------"
+    "BARYCENTRIC"
+    "-------------------------------------------------------"
+    # n0 = 5
+    # n1 = 10
+    # n2 = 20
+    # nodes = chebyshev_nodes(n0, a, b, kind=2)
+    # nodes1 = chebyshev_nodes(n1, a, b, kind=2)
+    # nodes2 = chebyshev_nodes(n2, a, b, kind=2)
+    # weights = barycentric_weights(nodes)
+    # weights1 = barycentric_weights(nodes1)
+    # weights2 = barycentric_weights(nodes2)
+    # y_nodes = f(nodes)
+    # y_nodes1 = f(nodes1)
+    # y_nodes2 = f(nodes2)
+    #
+    # p_bary = barycentric_interpolation(x_dense, nodes, weights, y_nodes)
+    # p_bary1 = barycentric_interpolation(x_dense, nodes1, weights1, y_nodes1)
+    # p_bary2 = barycentric_interpolation(x_dense, nodes2, weights2, y_nodes2)
+    # error_bary = np.max(np.abs(f(x_dense) - p_bary))
+    # error_bary1 = np.max(np.abs(f(x_dense) - p_bary1))
+    # error_bary2 = np.max(np.abs(f(x_dense) - p_bary2))
+    # print("Test 1: Barycentric Interpolation max error (cubic):", error_bary)
+    # print("Test 2: Barycentric Interpolation max error (cubic):", error_bary1)
+    # print("Test 3: Barycentric Interpolation max error (cubic):", error_bary2)
+    #
+    # plt.figure()
+    # plt.plot(x_dense, f(x_dense), 'k-', label="f(x) exact")
+    # plt.plot(x_dense, p_bary, 'r--', label="Barycentric, n=5")
+    # plt.plot(x_dense, p_bary1, 'b--', label="Barycentric, n=10")
+    # plt.plot(x_dense, p_bary2, 'c--', label="Barycentric, n=20")
+    # plt.scatter(nodes2, y_nodes2, c='c', zorder=5, label="Nodes, n=20")
+    # plt.scatter(nodes1, y_nodes1, c='b', zorder=5, label="Nodes, n=10")
+    # plt.scatter(nodes, y_nodes, c='r', zorder=5, label="Nodes, n=5")
+    # plt.title("Barycentric Interpolation")
+    # plt.legend()
+    # plt.savefig("barycentric_interpolation10.png")
+    # plt.show()
+    #
+    # #
+    # "-------------------------------------------------------"
+    # "PIECEWISE"
+    # "-------------------------------------------------------"
+    # num_sub = 20
+    # p_piecewise = piecewise_polynomial(f, a, b, num_sub, x_dense, degree=3, local_method=2)
+    # error_piecewise = np.max(np.abs(f(x_dense) - p_piecewise))
+    # print("Test 2: Piecewise Polynomial Interpolation max error (cubic):", error_piecewise)
+    #
+    # plt.figure()
+    # plt.plot(x_dense, f(x_dense), 'k-', label="f(x) exact")
+    # plt.plot(x_dense, p_piecewise, 'g--', label="Piecewise poly interp.")
+    # plt.title("Piecewise Polynomial Interpolation")
+    # plt.legend()
+    # plt.savefig("piecewise_10_20.png")
+    # plt.show()
+    #
+    #
+    # "-------------------------------------------------------"
+    # "PIECEWISE HERMITE"
+    # "-------------------------------------------------------"
+    # p_piecewise2 = piecewise_polynomial(f, a, b, num_sub, x_dense, degree=3, local_method=2,
+    #                                     hermite=True, fprime=fprime)
+    # error_piecewise2 = np.max(np.abs(f(x_dense) - p_piecewise2))
+    # print("Test 3: Piecewise Hermite Polynomial Interpolation max error (cubic):", error_piecewise2)
+    #
+    # plt.figure()
+    # plt.plot(x_dense, f(x_dense), 'k-', label="f(x) exact")
+    # plt.plot(x_dense, p_piecewise2, 'g--', label="Piecewise poly interp.")
+    # plt.title("Piecewise Hermite Polynomial Interpolation")
+    # plt.legend()
+    # plt.savefig("piecewise_hermite_10_20.png")
+    # plt.show()
 
 
-# # -----------------------------
-# # Test 6: Randomized Testing with Random Cubic Functions
-# # -----------------------------
-# def random_cubic(x, coeffs):
-#     # coeffs: [a0, a1, a2, a3]
-#     return coeffs[0] + coeffs[1] * x + coeffs[2] * x ** 2 + coeffs[3] * x ** 3
-#
-#
-# num_tests = 10
-# errors = []
-# for _ in range(num_tests):
-#     # Random coefficients in a reasonable range
-#     coeffs = np.random.uniform(-5, 5, 4)
-#     f_random = lambda x: random_cubic(x, coeffs)
-#
-#     # Use Chebyshev nodes for exact interpolation for a cubic
-#     nodes_rand = chebyshev_nodes(n, a, b, kind=1)
-#     weights_rand = barycentric_weights(nodes_rand)
-#     y_rand = f_random(nodes_rand)
-#     p_rand = barycentric_interpolation(x_dense, nodes_rand, weights_rand, y_rand)
-#     err = np.max(np.abs(f_random(x_dense) - p_rand))
-#     errors.append(err)
-#
-# print("Test 6: Random Cubic Functions - average max error (Barycentric):", np.mean(errors))
+    # "-------------------------------------------------------"
+    # "CUBIC SPLINE"
+    # "-------------------------------------------------------"
+    # p_spline = []
+    # for n in (10, 50, 80):
+    #     x_nodes = np.linspace(a, b, n)
+    #     y_nodes = f(x_nodes)
+    #     M = cubic_spline_coefficients(x_nodes, y_nodes)
+    #     s_vals = []
+    #     for x in x_dense:
+    #         s = cubic_spline_polynomial(x_nodes, y_nodes, M, x)
+    #         s_vals.append(s)
+    #     s_vals = np.array(s_vals)
+    #     p_spline.append(s_vals)
+    #     error_spline1 = np.max(np.abs(f(x_dense) - p_spline))
+    #     print(f"Test 4: Cubic Spline max error for n={n}:", error_spline1)
+    #
+    # plt.figure()
+    # plt.plot(x_dense, f(x_dense), 'k-', label="f(x) exact")
+    # plt.plot(x_dense, p_spline[0], 'c--', label="Cubic Spline n=10")
+    # plt.plot(x_dense, p_spline[1], 'b--', label="Cubic Spline n=50")
+    # plt.plot(x_dense, p_spline[2], 'r--', label="Cubic Spline n=80")
+    # plt.title("Cubic Spline Interpolation")
+    # plt.legend()
+    # plt.savefig("cubic_spline_10.png")
+    # plt.show()
+
+
+    # "-------------------------------------------------------"
+    # "CUBIC B-SPLINE"
+    # "-------------------------------------------------------"
+    # p_spline2 = []
+    # for n in (10, 50, 80):
+    #     x_nodes = np.linspace(a, b, n)
+    #     y_nodes = f(x_nodes)
+    #     alpha = cubic_bspline_interpolation(x_nodes, f, fprime)
+    #     p_vals = np.zeros_like(x_dense)
+    #     h = x_nodes[1] - x_nodes[0]
+    #     x0 = x_nodes[0]
+    #     N = len(x_nodes) + 2
+    #
+    #     for i, x in enumerate(x_dense):
+    #         p = 0.0
+    #         for j in range(N):
+    #             index = j - 1
+    #             p += alpha[j] * cubic_bspline_coefficients(index, x, x0, h)
+    #         p_vals[i] = p
+    #
+    #     p_spline2.append(p_vals)
+    #     error_spline2 = np.max(np.abs(f(x_dense) - p_vals))
+    #     print(f"Test 5: Cubic B-Spline max error for n={n}:", error_spline2)
+    #
+    #
+    # plt.plot(x_dense, f(x_dense), 'k-', label="f(x) (exact)")
+    # plt.plot(x_dense, p_spline2[0], 'c--', label="Cubic B-spline n=10")
+    # plt.plot(x_dense, p_spline2[1], 'b--', label="Cubic B-spline n=50")
+    # plt.plot(x_dense, p_spline2[2], 'r--', label="Cubic B-spline n=80")
+    # plt.title("Cubic B-spline Interpolation via B-spline Basis")
+    # plt.xlabel("x")
+    # plt.ylabel("y")
+    # plt.legend()
+    # plt.savefig("cubic_Bspline_10.png")
+    # plt.show()
+
+    #
+    # "-------------------------------------------------------"
+    # "RANDOMIZED FUNCTIONS"
+    # "-------------------------------------------------------"
+    # def random_cubic(x, coeffs):
+    #     return coeffs[0] + (coeffs[1] * x) + (coeffs[2] * x ** 2) + (coeffs[3] * x ** 3)
+    #
+    # def random_quadratic(x, coeffs):
+    #     return coeffs[1] + (2 * coeffs[2] * x) + (3 * coeffs[3] * x ** 2)
+    #
+    # def random_linear(x, coeffs):
+    #     return (2 * coeffs[2]) + (6 * coeffs[3] * x)
+    #
+    #
+    # n = 20
+    # num_tests = 20
+    # coeffs_list = []
+    # errs_piecewise = []
+    # errs_hermite = []
+    # errs_spline = []
+    # errs_bspline = []  # Ensure this list is defined
+    # p_spline_list = []
+    #
+    # for test in range(num_tests):
+    #     # generate 4 randomly sampled coefficients from the normal distribution
+    #     coeff = np.random.randn(4) * 10
+    #     coeffs_list.append(coeff)
+    #     f_exact = lambda x: random_cubic(x, coeff)
+    #     fprime_exact = lambda x: random_quadratic(x, coeff)
+    #     y_exact = random_cubic(x_dense, coeff)
+    #     x_rand = chebyshev_nodes(n, a, b, 2)
+    #     y_rand = f_exact(x_rand)
+    #
+    #     # cubic piecewise interpolation
+    #     p_piecewise = piecewise_polynomial(f_exact, a, b, 20, x_dense, degree=3, local_method=2)
+    #     p_hermite = piecewise_polynomial(f_exact, a, b, 20, x_dense, degree=3, local_method=2,
+    #                                      hermite=True, fprime=fprime_exact)
+    #
+    #     # cubic spline interpolation
+    #     M = cubic_spline_coefficients(x_rand, y_rand)
+    #     p_spline1 = np.array([cubic_spline_polynomial(x_rand, y_rand, M, x) for x in x_dense])
+    #
+    #     alpha = cubic_bspline_interpolation(x_rand, f_exact, fprime_exact)
+    #     p_vals = np.zeros_like(x_dense)
+    #     h = x_rand[1] - x_rand[0]
+    #     x0 = x_rand[0]
+    #     N = len(x_rand) + 2
+    #     for i, x in enumerate(x_dense):
+    #         p = 0.0
+    #         for j in range(N):
+    #             index = j - 1
+    #             p += alpha[j] * cubic_bspline_coefficients(index, x, x0, h)
+    #         p_vals[i] = p
+    #     p_bspline = p_vals
+    #
+    #     err_piecewise = np.max(np.abs(y_exact - p_piecewise))
+    #     err_hermite = np.max(np.abs(y_exact - p_hermite))
+    #     err_spline = np.max(np.abs(y_exact - p_spline1))
+    #     err_bspline = np.max(np.abs(f_exact(x_dense) - p_bspline))  # Use f_exact here
+    #
+    #     errs_piecewise.append(err_piecewise)
+    #     errs_hermite.append(err_hermite)
+    #     errs_spline.append(err_spline)
+    #     errs_bspline.append(err_bspline)  # Append the bspline error
+    #     p_spline_list.append(p_spline1)
+    #
+    # coeffs_list = coeffs_list[::-1]
+    # print("Test\tCoefficients\t\t\tPiecewise Error\tPiecewise Hermite Error\tSpline Error\tBSpline Error")
+    # for i in range(num_tests):
+    #     coeff_str = np.array2string(coeffs_list[i], precision=3, separator=',')
+    #     print(
+    #         f"{i + 1}\t{coeff_str}\t{errs_piecewise[i]:.3e}\t{errs_hermite[i]:.3e}\t\t{errs_spline[i]:.3e}\t{errs_bspline[i]:.3e}")
+
+    "-------------------------------------------------------"
+    "TASK 2 TESTING"
+    "-------------------------------------------------------"
+    t_nodes = np.array([0.5, 1.0, 2.0, 4.0, 5.0, 10.0, 15.0, 20.0])
+    y_nodes = np.array([0.04, 0.05, 0.0682, 0.0801, 0.0940, 0.0981, 0.0912, 0.0857])
+    t_eval = np.arange(0.5, 20.0 + 0.5, 0.5)
+
+    M = cubic_spline_coefficients(t_nodes, y_nodes)
+    s_spline = []
+    sprime_spline = []
+    f_spline = []
+    D_spline = []
+    for t in t_eval:
+        y_t = cubic_spline_polynomial(t_nodes, y_nodes, M, t)
+        dy_t = cubic_spline_prime(t_nodes, y_nodes, M, t)
+        s_spline.append(y_t)
+        sprime_spline.append(dy_t)
+        f_spline.append(y_t + (t * dy_t))
+        D_spline.append(math.exp(-t * y_t))
+    s_spline = np.array(s_spline)
+    sprime_spline = np.array(sprime_spline)
+    f_spline = np.array(f_spline)
+    D_spline = np.array(D_spline)
+
+    print("Natural Cubic Spline Results")
+    print("   t       y(t)        f(t)         D(t)")
+    for i, t in enumerate(t_eval):
+        print(f"{t:5.1f}  {s_spline[i]:10.6f}  {f_spline[i]:10.6f}  {D_spline[i]:10.6f}")
+
+
+    def discrete_data_func(x, t_nodes, y_nodes):
+        return np.interp(x, t_nodes, y_nodes)
+
+    f = lambda x: discrete_data_func(x, t_nodes, y_nodes)
+
+
+    a = t_nodes[0]
+    b = t_nodes[-1]
+    num_sub = len(t_nodes) - 1
+    g_vals = piecewise_polynomial(f, a, b, num_sub, t_eval, degree=1, local_method=2)
+    gprime = np.zeros_like(t_eval, dtype=float)
+    slopes = []
+    for i in range(len(t_nodes) - 1):
+        slope = (y_nodes[i + 1] - y_nodes[i]) / (t_nodes[i + 1] - t_nodes[i])
+        slopes.append(slope)
+    for i, x in enumerate(t_eval):
+        if x <= t_nodes[0]:
+            sub_int = 0
+        elif x >= t_nodes[-1]:
+            sub_int = len(t_nodes) - 2
+        else:
+            sub_int = np.searchsorted(t_nodes, x) - 1
+        gprime[i] = slopes[sub_int]
+
+    f_piecewise = g_vals + (t_eval * gprime)
+    D_piecewise = np.exp(-t_eval * g_vals)
+
+    print("\nPiecewise Polynomial (degree=1)")
+    print("   t       y(t)        f(t)         D(t)")
+    for i, t in enumerate(t_eval):
+        print(f"{t:5.1f}  {g_vals[i]:10.6f}  {f_piecewise[i]:10.6f}  {D_piecewise[i]:10.6f}")
+
+    # plot y(t)
+    plt.plot(t_eval, s_spline, 'm--', label="Natural Cubic Spline")
+    plt.plot(t_eval, g_vals, 'c--', label="Piecewise Polynomial (deg=1)")
+    plt.scatter(t_nodes, y_nodes, c='r', zorder=5, label="Discrete Data")
+    plt.title("Interpolated y(t)")
+    plt.xlabel("t")
+    plt.ylabel("y(t)")
+    plt.legend()
+    plt.savefig("y.png")
+    plt.show()
+
+
+    # plot f(t) = y(t) + t*y'(t)
+    plt.plot(t_eval, f_spline, 'm--', label="Natural Cubic Spline")
+    plt.plot(t_eval, f_piecewise, 'c--', label="Piecewise Polynomial (deg=3)")
+    plt.title("Computed f(t) = y(t) + ty'(t)")
+    plt.xlabel("t")
+    plt.ylabel("f(t)")
+    plt.legend()
+    plt.savefig("f.png")
+    plt.show()
+
+    # plot D(t) = exp(-ty(t))
+    plt.plot(t_eval, D_spline, 'm--', label="Natural Cubic Spline")
+    plt.plot(t_eval, D_piecewise, 'c--', label="Piecewise Polynomial (deg=3)")
+    plt.title("Computed D(t) = exp(-ty(t))")
+    plt.xlabel("t")
+    plt.ylabel("D(t)")
+    plt.legend()
+    plt.savefig("D.png")
+    plt.show()
+
+
+
