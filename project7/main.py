@@ -1,5 +1,6 @@
 import numpy as np
 import math
+import matplotlib.pyplot as plt
 
 def composite_newton_cotes(a, b, N, f, num_points, closed=True):
     H = (b - a) / N
@@ -46,17 +47,16 @@ def gauss_legendre(a, b, f):
     return H1 * sum
 
 
-
 a = 0.1
 b = 1.3
 M = 4
 def f(x):
     return 5 * x * (math.e ** (- 2 * x))
 
-result = composite_newton_cotes(a, b, M, f, num_points=2, closed=False)
-print(result)
-result2 = gauss_legendre(a, b, f)
-print(result2)
+# result = composite_newton_cotes(a, b, M, f, num_points=2, closed=False)
+# print(result)
+# result2 = gauss_legendre(a, b, f)
+# print(result2)
 
 
 
@@ -72,10 +72,4 @@ def f4(x):
     return x * np.cos(2 * np.pi * x)
 def f5(x):
     return x + (1/x)
-
-
-
-
-
-
 
