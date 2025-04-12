@@ -2,7 +2,7 @@ import numpy as np
 import math
 import matplotlib.pyplot as plt
 
-def composite_newton_cotes(a, b, N, f, num_points, closed=True):
+def composite_newton_cotes(a, b, N, f, num_points, closed=True, alpha=False):
     H = (b - a) / N
     sum = 0
     if closed:
@@ -51,6 +51,72 @@ def composite_gauss_legendre(a, b, N, f):
     return sum * H / 2
 
 
+def adaptive_trapezoidal(f, a, b, tol=1e-6, maxiter=20):
+    # Initial estimate with one subinterval.
+    N = 1
+    h = b - a  # step size for current partition
+    T_old = 0.5 * h * (f(a) + f(b))
+
+    for iter in range(maxiter):
+        # Add new points: midpoints of each current subinterval.
+        new_sum = 0.0
+        for j in range(N):
+            x_mid = a + (j + 0.5) * h
+            new_sum += f(x_mid)
+
+        # The new composite trapezoidal rule with 2N intervals:
+        T_new = 0.5 * T_old + (h / 2) * new_sum
+
+        if abs(T_new - T_old) < tol:
+            return T_new
+
+        # Prepare for next iteration.
+        T_old = T_new
+        N *= 2
+        h /= 2
+
+    return T_new
+
+
+def adaptive_midpoint(f, a, b, tol=1e-6, maxiter=20):
+    h = b - a  # current subinterval length (coarse grid)
+    N = 1  # number of intervals (initially 1)
+    # Initial composite midpoint value:
+    S = f(a + h / 2)  # sum over the current grid (one midpoint)
+    M_old = h * S  # M_1
+
+    for iter in range(maxiter):
+        # In the next refinement, each current interval (of length h)
+        # is split into 3 subintervals (new step size h_new = h/3).
+        new_sum = 0.0
+        for i in range(N):
+            x_left = a + i * h
+            # Compute the two new midpoints (for the first and third subintervals):
+            new_sum += f(x_left + h / 6) + f(x_left + 5 * h / 6)
+        # Add the new values to the already computed ones (the previous midpoints)
+        # Note: In each old interval the midpoint at x_left+h/2 is already in S.
+        S = S + new_sum
+        # Now update the subinterval width:
+        h_new = h / 3
+        # The refined grid now has 3*N subintervals and the composite midpoint
+        # estimate is:
+        M_new = h_new * S
+
+        if abs(M_new - M_old) < tol:
+            return M_new
+
+        # Prepare for the next iteration.
+        M_old = M_new
+        # Reset the current step size: now each subinterval in the refined grid
+        # becomes the "old" block for the next refinement.
+        h = h_new
+        N *= 3
+
+    return M_new
+
+
+
+
 """FUNCTIONS FOR TESTING"""
 def f1(x):
     return (math.e ** x)
@@ -69,7 +135,10 @@ a = 0
 b = 3
 M = 20
 
-
+ref1 = adaptive_trapezoidal(f1, a, b)
+print(ref1)
+ref2 = adaptive_midpoint(f1, a, b)
+print(ref2)
 
 for f in [f1, f2, f3, f4]:
     print("Function", f.__name__)
