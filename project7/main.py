@@ -38,26 +38,17 @@ def composite_newton_cotes(a, b, N, f, num_points, closed=True):
                 sum += f(x1) + f(x2)
             return (H/2) * sum
 
-def gauss_legendre(a, b, f):
-    H1 = (b - a) / 2
-    H2 = (b + a) / 2
-    x1 = - 1 / np.sqrt(3)
-    x2 = 1 / np.sqrt(3)
-    sum = f((H1 * x1) + H2) + f((H1 * x2) + H2)
-    return H1 * sum
-
-
-a = 0.1
-b = 1.3
-M = 4
-def f(x):
-    return 5 * x * (math.e ** (- 2 * x))
-
-# result = composite_newton_cotes(a, b, M, f, num_points=2, closed=False)
-# print(result)
-# result2 = gauss_legendre(a, b, f)
-# print(result2)
-
+def composite_gauss_legendre(a, b, N, f):
+    H = (b - a) / N
+    x1 = 1 / np.sqrt(3)
+    sum = 0
+    for i in range(N):
+        a_i = a + (i*H)
+        b_i = a + ((i+1)*H)
+        term1 = (b_i - a_i) / 2
+        term2 = (b_i + a_i) / 2
+        sum += f((x1 * term1) + term2) + f((-1 * x1 * term1) + term2)
+    return sum * H / 2
 
 
 """FUNCTIONS FOR TESTING"""
@@ -73,3 +64,20 @@ def f4(x):
 def f5(x):
     return x + (1/x)
 
+
+a = 0
+b = 3
+M = 20
+
+
+
+for f in [f1, f2, f3, f4]:
+    print("Function", f.__name__)
+    result = composite_gauss_legendre(a, b, M, f)
+    print("GL:", result)
+    for n in range(1,3):
+        result1 = composite_newton_cotes(a, b, M, f, num_points=n, closed=False)
+        print(f"NC Open n={n}:", result1)
+    for n in range(1,4):
+        result2 = composite_newton_cotes(a, b, M, f, num_points=n)
+        print(f"NC Closed n={n}:", result2)
