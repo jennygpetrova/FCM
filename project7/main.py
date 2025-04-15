@@ -1,8 +1,7 @@
 import numpy as np
 import math
-import matplotlib.pyplot as plt
 
-def composite_newton_cotes(a, b, N, f, num_points, closed=True, alpha=False):
+def composite_newton_cotes(a, b, N, f, num_points, closed=True):
     H = (b - a) / N
     sum = 0
     if closed:
@@ -50,72 +49,56 @@ def composite_gauss_legendre(a, b, N, f):
         sum += f((x1 * term1) + term2) + f((-1 * x1 * term1) + term2)
     return sum * H / 2
 
-
-def adaptive_trapezoidal(f, a, b, tol=1e-6, maxiter=20):
-    # Initial estimate with one subinterval.
-    N = 1
-    h = b - a  # step size for current partition
-    T_old = 0.5 * h * (f(a) + f(b))
-
-    for iter in range(maxiter):
-        # Add new points: midpoints of each current subinterval.
-        new_sum = 0.0
-        for j in range(N):
-            x_mid = a + (j + 0.5) * h
-            new_sum += f(x_mid)
-
-        # The new composite trapezoidal rule with 2N intervals:
-        T_new = 0.5 * T_old + (h / 2) * new_sum
-
-        if abs(T_new - T_old) < tol:
-            return T_new
-
-        # Prepare for next iteration.
-        T_old = T_new
-        N *= 2
-        h /= 2
-
-    return T_new
-
-
-def adaptive_midpoint(f, a, b, tol=1e-6, maxiter=20):
-    h = b - a  # current subinterval length (coarse grid)
-    N = 1  # number of intervals (initially 1)
-    # Initial composite midpoint value:
-    S = f(a + h / 2)  # sum over the current grid (one midpoint)
-    M_old = h * S  # M_1
-
-    for iter in range(maxiter):
-        # In the next refinement, each current interval (of length h)
-        # is split into 3 subintervals (new step size h_new = h/3).
-        new_sum = 0.0
+def adaptive_midpoint(a, b, N, f, true_est, tol=1e-6, maxiter=20):
+    H = (b - a) / N
+    sum = 0
+    k = (1/2)
+    for i in range(N):
+        sum += f(a + (i + k) * H)
+    I = H * sum
+    for iteration in range(maxiter):
+        H_new = H / 3
+        N_new = N * 3
+        sum_new = 0
         for i in range(N):
-            x_left = a + i * h
-            # Compute the two new midpoints (for the first and third subintervals):
-            new_sum += f(x_left + h / 6) + f(x_left + 5 * h / 6)
-        # Add the new values to the already computed ones (the previous midpoints)
-        # Note: In each old interval the midpoint at x_left+h/2 is already in S.
-        S = S + new_sum
-        # Now update the subinterval width:
-        h_new = h / 3
-        # The refined grid now has 3*N subintervals and the composite midpoint
-        # estimate is:
-        M_new = h_new * S
-
-        if abs(M_new - M_old) < tol:
-            return M_new
-
-        # Prepare for the next iteration.
-        M_old = M_new
-        # Reset the current step size: now each subinterval in the refined grid
-        # becomes the "old" block for the next refinement.
-        h = h_new
-        N *= 3
-
-    return M_new
+            base = a + i * (3 * H_new)
+            x_left = base + k * H_new
+            x_right = base + (k+2) * H_new
+            sum_new += f(x_left) + f(x_right)
+        sum += sum_new
+        I_new = H_new * sum
+        err = (9 / 8) * (I_new - I)
+        est = true_est - I
+        print(f"{N} & {I:.8f} & {err:.8f} & {est:.8f}", r"\\")
+        if abs(err) < tol:
+            return I_new, N_new
+        I = I_new
+        N = N_new
+        H = H_new
+    return I, N_new
 
 
-
+def adaptive_trapezoidal(a, b, N, f, true_est, tol=1e-6, maxiter=20):
+    H = (b - a) / N
+    sum = ( f(a) + f(b) ) / 2
+    for i in range(1, N):
+        sum += f(a + (i * H))
+    I = H * sum
+    for iteration in range(maxiter):
+        N_new = N * 2
+        H_new = H / 2
+        for i in range(1, N_new, 2):
+            sum += f(a + (i * H_new))
+        I_new = H_new * sum
+        err = (4/3) * (I_new - I)
+        est = true_est - I
+        print(f"{N} & {I:.8f} & {err:.8f} & {est:.8f}", r"\\")
+        if abs(err) < tol:
+            return I_new, N_new
+        I = I_new
+        N = N_new
+        H = H_new
+    return I, N_new
 
 """FUNCTIONS FOR TESTING"""
 def f1(x):
@@ -124,29 +107,99 @@ def f2(x):
     exp = np.sin(2 * x)
     return (math.e ** exp) * np.cos(2 * x)
 def f3(x):
-    return np.tanh(x)
+    return math.tanh(x)
 def f4(x):
     return x * np.cos(2 * np.pi * x)
 def f5(x):
     return x + (1/x)
+def f6(x):
+    return 2 ** x
+def f7(x):
+    return (x ** 3) - (6 * (x ** 2)) + (12 * x) - 8
+def f8(x):
+    return 2 * x
+
+"CORRESPONDING TRUE VALUES"
+f1_true = math.e ** 3 - 1
+# print(f1_true)
+f2_true = 0.5 * (-1 + math.e ** (np.sqrt(3)/2))
+# print(f2_true)
+f3_true = math.log(math.cosh(1)/math.cosh(2))
+# print(f3_true)
+f4_true = - 1 / (2 * np.pi ** 2)
+# print(f4_true)
+f5_true = (2.5 ** 2 - 0.1 ** 2) / 2 + math.log(2.5/0.1)
+# print(f5_true)
+f6_true = 15 / math.log(2)
+#print(f6_true)
+f7_true = 0
+# print(f7_true)
+f8_true = 0
+
+"TABLE OUTPUTS"
+a = -1
+b = 1
+M_list = [5, 10, 20, 40, 80]
+N = 1
+results_open = []
+results_closed = []
+for M in M_list:
+    # Open methods
+    nc_open1 = composite_newton_cotes(a, b, M, f8, num_points=1, closed=False)
+    err1 = f8_true - nc_open1
+    nc_open2 = composite_newton_cotes(a, b, M, f8, num_points=2, closed=False)
+    err2 = f8_true - nc_open2
+    gl = composite_gauss_legendre(a, b, M, f8)
+    err3 = f8_true - gl
+    results_open.append((M, nc_open1, err1, nc_open2, err2, gl, err3))
+    # Closed methods
+    nc_closed1 = composite_newton_cotes(a, b, M, f8, num_points=1, closed=True)
+    err4 = f8_true - nc_closed1
+    nc_closed2 = composite_newton_cotes(a, b, M, f8, num_points=2, closed=True)
+    err5 = f8_true - nc_closed2
+    nc_closed3 = composite_newton_cotes(a, b, M, f8, num_points=3, closed=True)
+    err6 = f8_true - nc_closed3
+    results_closed.append((M, nc_closed1, err4, nc_closed2, err5, nc_closed3, err6))
 
 
-a = 0
-b = 3
-M = 20
+# Table for Open Methods
+latex_table_open = r"""\begin{table}[H]
+\begin{adjustwidth}{-2.5cm}{}
+\caption{Approximations using Open Interval Methods}
+\begin{tabular}{c c c c c c c}
+\hline
+$N$ & Midpoint ($n=1$) & $E(f)$ & 2-Point ($n=2$) & $E(f)$ & Gauss-Legendre ($n=2$) & $E(f)$ \\
+\hline
+"""
+for row in results_open:
+    M, nc1, err1, nc2, err2, gl2, err3 = row
+    latex_table_open += f"{M}  & {nc1:.8f} & {err1:.8f} & {nc2:.8f} & {err2:.8f} & {gl2:.8f} & {err3:.8f} \\\\\n"
+latex_table_open += r"\hline" + "\n" + r"\end{tabular}" + "\n" + r"\end{adjustwidth}" + "\n" + r"\end{table}"
 
-ref1 = adaptive_trapezoidal(f1, a, b)
-print(ref1)
-ref2 = adaptive_midpoint(f1, a, b)
-print(ref2)
+print(latex_table_open)
 
-for f in [f1, f2, f3, f4]:
-    print("Function", f.__name__)
-    result = composite_gauss_legendre(a, b, M, f)
-    print("GL:", result)
-    for n in range(1,3):
-        result1 = composite_newton_cotes(a, b, M, f, num_points=n, closed=False)
-        print(f"NC Open n={n}:", result1)
-    for n in range(1,4):
-        result2 = composite_newton_cotes(a, b, M, f, num_points=n)
-        print(f"NC Closed n={n}:", result2)
+
+# Table for Closed Methods
+latex_table_closed = r"""\begin{table}[H]
+\begin{adjustwidth}{-2.5cm}{}
+\caption{Approximations using Closed Interval Methods}
+\begin{tabular}{c c c c c c c}
+\hline
+$N$ & Left Rectangle ($n=1$) & $E(f)$ & Trapezoidal ($n=2$) & $E(f)$ & Simpson's ($n=3$) & $E(f)$ \\
+\hline
+"""
+for row in results_closed:
+    M, nc1, err1, nc2, err2, nc3, err3 = row
+    latex_table_closed += f"{M}  & {nc1:.8f} & {err1:.8f} & {nc2:.8f} & {err2:.8f} & {nc3:.8f} & {err3:.8f} \\\\\n"
+latex_table_closed += r"\hline" + "\n" + r"\end{tabular}" + "\n" + r"\end{adjustwidth}" + "\n" + r"\end{table}"
+
+print(latex_table_closed)
+
+
+# Table for Adaptive Methods
+print(f"N & $I_n$  & $I - I_n$ & Error Estimate \hline")
+mdpt, N_mdpt = adaptive_midpoint(a, b, N, f8, f8_true, tol=1e-6, maxiter=20)
+print(f"\hline")
+print(f"N & $I_n$  & $I - I_n$ & Error Estimate \hline")
+trap, N_trap = adaptive_trapezoidal(a, b, N, f8, f8_true, tol=1e-6, maxiter=20)
+print(f"\hline")
